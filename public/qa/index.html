@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>The 1% Club — QA</title>
+  <link rel="stylesheet" href="/shared/theme.css" />
+  <link rel="stylesheet" href="/shared/boot.css" />
+  <style>
+    body {
+      min-height: 100dvh;
+      margin: 0;
+      background: linear-gradient(180deg, #071433, #050b1a);
+      color: var(--text-light);
+      font-family: var(--font-body);
+      padding: 1rem;
+      padding-bottom: 5rem;
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+      align-items: baseline;
+      margin-bottom: 1rem;
+    }
+    h1 {
+      margin: 0;
+      font-family: var(--font-display);
+      letter-spacing: 0.06em;
+      font-size: 1.4rem;
+    }
+    h1 span { color: var(--club-cyan); }
+    a { color: var(--club-cyan); }
+    .grid {
+      display: grid;
+      gap: 1rem;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+    .card {
+      background: rgba(13, 34, 88, 0.55);
+      border: 1px solid rgba(46, 230, 255, 0.2);
+      border-radius: 12px;
+      padding: 1rem;
+    }
+    .card h2 {
+      margin: 0 0 0.75rem;
+      font-size: 0.85rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--club-cyan);
+    }
+    label {
+      display: block;
+      margin: 0.45rem 0 0.25rem;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+    }
+    input, select, textarea, button {
+      font: inherit;
+    }
+    input, select, textarea {
+      width: 100%;
+      box-sizing: border-box;
+      background: rgba(0,0,0,0.35);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 8px;
+      color: var(--text-light);
+      padding: 0.65rem 0.7rem;
+    }
+    textarea { min-height: 110px; resize: vertical; }
+    button.primary {
+      margin-top: 0.75rem;
+      width: 100%;
+      border: none;
+      border-radius: 10px;
+      padding: 0.85rem;
+      font-weight: 800;
+      background: linear-gradient(180deg, var(--club-cyan), #1499b0);
+      color: #031018;
+      cursor: pointer;
+    }
+    .item {
+      border-top: 1px solid rgba(255,255,255,0.08);
+      padding: 0.75rem 0;
+    }
+    .item:first-child { border-top: none; padding-top: 0; }
+    .meta {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-bottom: 0.35rem;
+    }
+    .sev {
+      display: inline-block;
+      padding: 0.1rem 0.45rem;
+      border-radius: 999px;
+      font-size: 0.7rem;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      background: rgba(46,230,255,0.15);
+      color: var(--club-cyan);
+    }
+    .sev.blocker { background: rgba(255,59,107,0.2); color: var(--club-danger); }
+    .sev.major { background: rgba(255,213,74,0.18); color: var(--club-gold); }
+    .status { margin-top: 0.5rem; font-size: 0.85rem; color: var(--club-ok); min-height: 1.2em; }
+    .status.err { color: var(--club-danger); }
+    .muted { color: var(--text-muted); }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>QA <span>BOARD</span></h1>
+    <div><a href="/">Home</a> · <a href="/host/">Host</a> · <a href="/display/">TV</a></div>
+  </header>
+  <div class="grid">
+    <section class="card">
+      <h2>Leave feedback</h2>
+      <label>Screen
+        <select id="screen">
+          <option>display</option>
+          <option>host</option>
+          <option>play</option>
+          <option>general</option>
+        </select>
+      </label>
+      <label>Type
+        <select id="type">
+          <option value="bug">Bug</option>
+          <option value="ux">UX / look</option>
+          <option value="rules">Rules / gameplay</option>
+          <option value="idea">Idea</option>
+          <option value="other">Other</option>
+        </select>
+      </label>
+      <label>Severity
+        <select id="severity">
+          <option value="blocker">Blocker</option>
+          <option value="major">Major</option>
+          <option value="minor" selected>Minor</option>
+          <option value="nit">Nit</option>
+        </select>
+      </label>
+      <label>Note
+        <textarea id="note" placeholder="What broke / what you want changed"></textarea>
+      </label>
+      <label>Your name (optional)
+        <input id="name" maxlength="40" />
+      </label>
+      <button class="primary" id="send">Submit</button>
+      <div class="status" id="status"></div>
+    </section>
+    <section class="card">
+      <h2>Inbox <button class="btn-ghost" id="refresh" style="float:right;padding:0.35rem 0.6rem">Refresh</button></h2>
+      <div id="list" class="muted">Loading…</div>
+    </section>
+  </div>
+  <script type="module">
+    import { mountQaWidget } from '/shared/boot.js';
+
+    async function loadList() {
+      const list = document.getElementById('list');
+      try {
+        const data = await fetch('/api/feedback').then((r) => r.json());
+        const items = data.items || [];
+        if (!items.length) {
+          list.innerHTML = '<p class="muted">No feedback yet. Use the form or the QA button on any screen.</p>';
+          return;
+        }
+        list.innerHTML = items
+          .map(
+            (i) => `<article class="item">
+              <div class="meta">
+                <span class="sev ${i.severity}">${i.severity}</span>
+                ${i.type} · ${i.screen} · ${new Date(i.at).toLocaleString()}
+                ${i.name ? `· ${i.name}` : ''}
+              </div>
+              <div>${escapeHtml(i.note)}</div>
+              ${i.url ? `<div class="meta">${escapeHtml(i.url)}</div>` : ''}
+            </article>`,
+          )
+          .join('');
+      } catch (err) {
+        list.innerHTML = `<p class="status err">${escapeHtml(err.message)}</p>`;
+      }
+    }
+
+    function escapeHtml(s) {
+      return String(s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+    }
+
+    document.getElementById('send').addEventListener('click', async () => {
+      const status = document.getElementById('status');
+      status.classList.remove('err');
+      status.textContent = 'Saving…';
+      try {
+        const res = await fetch('/api/feedback', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            screen: document.getElementById('screen').value,
+            type: document.getElementById('type').value,
+            severity: document.getElementById('severity').value,
+            note: document.getElementById('note').value,
+            name: document.getElementById('name').value,
+            url: location.href,
+            userAgent: navigator.userAgent,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed');
+        status.textContent = 'Saved.';
+        document.getElementById('note').value = '';
+        loadList();
+      } catch (err) {
+        status.classList.add('err');
+        status.textContent = err.message;
+      }
+    });
+
+    document.getElementById('refresh').addEventListener('click', loadList);
+    mountQaWidget('qa');
+    loadList();
+    setInterval(loadList, 8000);
+  </script>
+</body>
+</html>

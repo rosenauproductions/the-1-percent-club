@@ -1,0 +1,332 @@
+.play-body {
+  min-height: 100dvh;
+  background: linear-gradient(180deg, #0a1a44 0%, var(--club-navy) 55%, #02040c 100%);
+  padding-bottom: calc(1rem + env(safe-area-inset-bottom));
+}
+
+.play-header {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.85rem 1rem;
+  background: rgba(5, 11, 26, 0.9);
+  border-bottom: 1px solid rgba(46, 230, 255, 0.2);
+  backdrop-filter: blur(8px);
+}
+
+.brand {
+  font-family: var(--font-display);
+  color: var(--club-cyan);
+  letter-spacing: 0.08em;
+}
+
+.play-meta {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  text-align: right;
+}
+
+.play-main {
+  padding: 1rem;
+  max-width: 480px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.hero {
+  text-align: center;
+  padding: 1.5rem 0.5rem;
+}
+
+.hero h1 {
+  margin: 0 0 0.5rem;
+  font-family: var(--font-display);
+  font-size: 2rem;
+  letter-spacing: 0.04em;
+}
+
+.hero p {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+.card {
+  background: rgba(13, 34, 88, 0.55);
+  border: 1px solid rgba(46, 230, 255, 0.18);
+  border-radius: var(--radius);
+  padding: 1rem;
+}
+
+.card h2 {
+  margin: 0 0 0.75rem;
+  font-size: 0.9rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--club-cyan);
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+label.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+input[type='text'] {
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: var(--text-light);
+  border-radius: 10px;
+  padding: 0.9rem 0.85rem;
+  font-size: 1.05rem;
+}
+
+.big-btn {
+  width: 100%;
+  padding: 1rem;
+  font-size: 1.05rem;
+}
+
+.pct {
+  font-family: var(--font-display);
+  font-size: 2.4rem;
+  color: var(--club-cyan);
+  text-align: center;
+}
+
+.prompt {
+  font-size: 1.2rem;
+  font-weight: 800;
+  line-height: 1.35;
+  text-align: center;
+}
+
+.timer {
+  font-family: var(--font-display);
+  font-size: 3rem;
+  text-align: center;
+  color: var(--club-gold);
+}
+
+.timer.warn {
+  color: var(--club-danger);
+}
+
+.status-pill {
+  display: inline-block;
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  background: rgba(46, 230, 255, 0.12);
+  color: var(--club-cyan);
+  font-weight: 800;
+  font-size: 0.85rem;
+  letter-spacing: 0.06em;
+}
+
+.status-pill.out {
+  background: rgba(255, 59, 107, 0.15);
+  color: var(--club-danger);
+}
+
+.status-pill.win {
+  background: rgba(255, 213, 74, 0.18);
+  color: var(--club-gold);
+}
+
+.muted {
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.error {
+  color: var(--club-danger);
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+.pass-btn--locked {
+  opacity: 0.55;
+}
+
+.pass-hint {
+  margin: 0;
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+/* Eliminated — down-casting blue spotlight */
+body.is-eliminated {
+  background: #020617;
+}
+
+body.is-eliminated .play-header {
+  background: rgba(2, 6, 23, 0.75);
+  border-bottom-color: rgba(70, 120, 210, 0.35);
+}
+
+/* Search phase — all active phones fade green → blue with eliminating.mp3 */
+body.elim-searching {
+  animation: elim-fade-green-blue 4.4s ease-in-out forwards;
+}
+
+body.elim-searching .play-header {
+  transition: background 4.4s ease, border-color 4.4s ease;
+  background: rgba(10, 30, 70, 0.9);
+  border-bottom-color: rgba(90, 150, 255, 0.45);
+}
+
+@keyframes elim-fade-green-blue {
+  0% {
+    background: radial-gradient(ellipse at 50% 0%, rgba(61, 255, 154, 0.35), #071a12 55%, #020617 100%);
+  }
+  100% {
+    background: radial-gradient(ellipse at 50% 0%, rgba(90, 150, 255, 0.45), #071433 50%, #020617 100%);
+  }
+}
+
+.out-screen {
+  position: relative;
+  min-height: calc(100dvh - 5.5rem);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.out-screen__content {
+  position: relative;
+  z-index: 2;
+}
+
+.elim-spotlight {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.elim-spotlight__beam {
+  position: absolute;
+  top: -8%;
+  left: 50%;
+  width: 140vmax;
+  height: 120vmax;
+  transform: translateX(-50%);
+  background: conic-gradient(
+    from 180deg at 50% 0%,
+    transparent 0deg,
+    transparent 68deg,
+    rgba(90, 150, 255, 0.08) 78deg,
+    rgba(70, 130, 230, 0.28) 88deg,
+    rgba(120, 180, 255, 0.45) 90deg,
+    rgba(70, 130, 230, 0.28) 92deg,
+    rgba(90, 150, 255, 0.08) 102deg,
+    transparent 112deg,
+    transparent 360deg
+  );
+  clip-path: polygon(42% 0%, 58% 0%, 92% 100%, 8% 100%);
+  animation: elim-beam-in 1.1s ease-out both, elim-beam-breathe 3.5s ease-in-out 1.1s infinite;
+  filter: blur(0.5px);
+}
+
+.elim-spotlight__glow {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: min(70vw, 280px);
+  height: 28vh;
+  transform: translateX(-50%);
+  background: radial-gradient(
+    ellipse at 50% 0%,
+    rgba(160, 200, 255, 0.75) 0%,
+    rgba(70, 130, 230, 0.35) 35%,
+    transparent 72%
+  );
+  animation: elim-glow-in 0.9s ease-out both;
+}
+
+.elim-spotlight__pool {
+  position: absolute;
+  bottom: 8%;
+  left: 50%;
+  width: min(90vw, 360px);
+  height: 28vh;
+  transform: translateX(-50%);
+  background: radial-gradient(
+    ellipse at center,
+    rgba(90, 150, 255, 0.35) 0%,
+    rgba(40, 80, 180, 0.18) 40%,
+    transparent 70%
+  );
+  animation: elim-pool-in 1.2s ease-out both;
+}
+
+.out-screen--eliminated .out-screen__content h1 {
+  color: #c5d8ff;
+  text-shadow: 0 0 24px rgba(90, 150, 255, 0.55);
+}
+
+.out-screen--eliminated .status-pill.out {
+  background: rgba(70, 130, 230, 0.25);
+  color: #b8d0ff;
+  border: 1px solid rgba(120, 170, 255, 0.35);
+}
+
+@keyframes elim-beam-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-12%) scaleY(0.7);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scaleY(1);
+  }
+}
+
+@keyframes elim-beam-breathe {
+  0%,
+  100% {
+    opacity: 0.85;
+    filter: blur(0.5px) brightness(1);
+  }
+  50% {
+    opacity: 1;
+    filter: blur(0.5px) brightness(1.12);
+  }
+}
+
+@keyframes elim-glow-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) scale(1);
+  }
+}
+
+@keyframes elim-pool-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) scale(0.7);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) scale(1);
+  }
+}

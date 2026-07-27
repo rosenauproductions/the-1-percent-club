@@ -1,0 +1,137 @@
+/* Shared connection status + JS error banner + QA feedback button */
+.boot-banner {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  top: 12px;
+  z-index: 9998;
+  background: rgba(8, 16, 40, 0.96);
+  border: 1px solid rgba(46, 230, 255, 0.45);
+  color: #f4f8ff;
+  border-radius: 12px;
+  padding: 0.85rem 1rem;
+  font: 600 0.9rem/1.35 system-ui, sans-serif;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.45);
+  display: none;
+}
+
+.boot-banner.show {
+  display: block;
+}
+
+.boot-banner.error {
+  border-color: rgba(255, 59, 107, 0.7);
+}
+
+.boot-banner code {
+  color: #2ee6ff;
+}
+
+.qa-fab {
+  position: fixed;
+  right: 14px;
+  bottom: 14px;
+  z-index: 9999;
+  border: none;
+  border-radius: 999px;
+  padding: 0.7rem 1rem;
+  font: 800 0.8rem/1 system-ui, sans-serif;
+  letter-spacing: 0.06em;
+  background: linear-gradient(180deg, #ffe27a, #ffd54a);
+  color: #1a1400;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+}
+
+.qa-panel {
+  position: fixed;
+  right: 14px;
+  bottom: 64px;
+  width: min(360px, calc(100vw - 28px));
+  z-index: 9999;
+  background: rgba(8, 16, 40, 0.98);
+  border: 1px solid rgba(46, 230, 255, 0.35);
+  border-radius: 14px;
+  padding: 0.9rem;
+  color: #f4f8ff;
+  font: 500 0.9rem/1.4 system-ui, sans-serif;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+  display: none;
+}
+
+.qa-panel.open {
+  display: block;
+}
+
+.qa-panel h3 {
+  margin: 0 0 0.6rem;
+  font-size: 0.85rem;
+  letter-spacing: 0.08em;
+  color: #2ee6ff;
+  text-transform: uppercase;
+}
+
+.qa-panel label {
+  display: block;
+  margin: 0.45rem 0 0.25rem;
+  color: #8aa0c8;
+  font-size: 0.8rem;
+}
+
+.qa-panel select,
+.qa-panel textarea,
+.qa-panel input {
+  width: 100%;
+  box-sizing: border-box;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  color: #f4f8ff;
+  padding: 0.55rem 0.65rem;
+  font: inherit;
+}
+
+.qa-panel textarea {
+  min-height: 90px;
+  resize: vertical;
+}
+
+.qa-panel .qa-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.7rem;
+}
+
+.qa-panel button {
+  flex: 1;
+  border: none;
+  border-radius: 8px;
+  padding: 0.65rem;
+  font: 700 0.85rem system-ui, sans-serif;
+  cursor: pointer;
+}
+
+.qa-panel .qa-submit {
+  background: linear-gradient(180deg, #2ee6ff, #1499b0);
+  color: #031018;
+}
+
+.qa-panel .qa-cancel {
+  background: rgba(255, 255, 255, 0.08);
+  color: #f4f8ff;
+}
+
+.qa-panel .qa-status {
+  margin-top: 0.5rem;
+  font-size: 0.8rem;
+  color: #3dff9a;
+  min-height: 1.1em;
+}
+
+.qa-panel .qa-status.err {
+  color: #ff3b6b;
+}
+
+.qa-panel a {
+  color: #2ee6ff;
+}

@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>The 1% Club — Display</title>
+  <link rel="stylesheet" href="/shared/theme.css" />
+  <link rel="stylesheet" href="/shared/boot.css" />
+  <link rel="stylesheet" href="display.css" />
+</head>
+<body class="display-body">
+  <div class="display-stage">
+    <div class="display-stage__inner" id="stage">
+      <div class="arena-bg"></div>
+      <header class="top-bar">
+        <div class="brand">THE <span>1%</span> CLUB</div>
+        <div class="jackpot-chip">
+          <span class="jackpot-chip__label">JACKPOT</span>
+          <span class="jackpot-chip__value money" id="jackpot">$0</span>
+        </div>
+        <div class="alive-chip">
+          <span id="aliveCount">0</span> IN
+        </div>
+      </header>
+      <main id="main" class="main">
+        <div class="center-phase">
+          <h1>CONNECTING…</h1>
+          <p>Loading game state from the server</p>
+        </div>
+      </main>
+      <div class="tap-hint" id="tapHint">Tap anywhere for sound</div>
+    </div>
+  </div>
+  <script type="module" src="display.js"></script>
+</body>
+</html>

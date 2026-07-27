@@ -1,0 +1,86 @@
+:root {
+  --club-navy: #050b1a;
+  --club-navy-mid: #0a1840;
+  --club-panel: #0d2258;
+  --club-cyan: #2ee6ff;
+  --club-cyan-dim: #1a8a99;
+  --club-white: #f4f8ff;
+  --club-seat: #7dffb0;
+  --club-seat-in: rgba(61, 255, 154, 0.35);
+  --club-seat-out: rgba(58, 107, 181, 0.55);
+  --club-seat-pass: #3a6bb5;
+  --club-gold: #ffd54a;
+  --club-danger: #ff3b6b;
+  --club-ok: #3dff9a;
+  --text-light: #f4f8ff;
+  --text-muted: #8aa0c8;
+  --font-display: "Arial Black", "Impact", "Haettenschweiler", sans-serif;
+  --font-body: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --radius: 12px;
+  --shadow-glow: 0 0 24px rgba(46, 230, 255, 0.35);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  font-family: var(--font-body);
+  background: var(--club-navy);
+  color: var(--text-light);
+  -webkit-tap-highlight-color: transparent;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  border-radius: 10px;
+  padding: 0.75rem 1rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.btn-primary {
+  background: linear-gradient(180deg, var(--club-cyan), #1499b0);
+  color: #031018;
+  box-shadow: var(--shadow-glow);
+}
+
+.btn-primary:disabled {
+  opacity: 0.45;
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+.btn-ghost {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-light);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.btn-danger {
+  background: linear-gradient(180deg, #ff5a7e, var(--club-danger));
+  color: #fff;
+}
+
+.btn-gold {
+  background: linear-gradient(180deg, #ffe27a, var(--club-gold));
+  color: #1a1400;
+}
+
+.money {
+  font-variant-numeric: tabular-nums;
+  color: var(--club-gold);
+  font-weight: 800;
+}

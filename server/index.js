@@ -1,0 +1,520 @@
+import express from 'express';
+import { createServer } from 'http';
+import { WebSocketServer } from 'ws';
+import fs from 'fs/promises';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import QRCode from 'qrcode';
+import {
+  createInitialState,
+  applySetup,
+  joinPlayer,
+  removePlayer,
+  closeLobby,
+  reopenLobby,
+  startGame,
+  skipIntro,
+  beginQuestion,
+  startAnswering,
+  submitAnswer,
+  usePass,
+  endAnsweringWithForces,
+  finishEliminationSearch,
+  revealNextEliminated,
+  advanceAfterReveal,
+  hostOverride,
+  cashoutDecide,
+  resolveCashout,
+  finalDecide,
+  resolveFinalChoice,
+  soloDecide,
+  clearSoundCue,
+  resetToLobby,
+  sanitizeStateForClient,
+  activeCount,
+  createJoinCode,
+  ELIM_REVEAL_GAP_MS,
+} from './gameState.js';
+import { MDNS_NAME, networkInfo } from './network.js';
+import { Bonjour } from 'bonjour-service';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const ROOT = path.join(__dirname, '..');
+const QUESTIONS_DIR = path.join(ROOT, 'data', 'questions');
+const SOUNDS_DIR = path.join(ROOT, 'public', 'sounds');
+const PUBLIC_DIR = path.join(ROOT, 'public');
+const FEEDBACK_FILE = path.join(ROOT, 'data', 'feedback.jsonl');
+const PORT = Number(process.env.PORT) || 3457;
+
+let state = createInitialState();
+const clients = new Set();
+let answerTimer = null;
+let elimSearchTimer = null;
+let elimRevealTimer = null;
+
+function clearAnswerTimer() {
+  if (answerTimer) {
+    clearTimeout(answerTimer);
+    answerTimer = null;
+  }
+}
+
+function clearElimTimers() {
+  if (elimSearchTimer) {
+    clearTimeout(elimSearchTimer);
+    elimSearchTimer = null;
+  }
+  if (elimRevealTimer) {
+    clearTimeout(elimRevealTimer);
+    elimRevealTimer = null;
+  }
+}
+
+function scheduleAnswerTimer() {
+  clearAnswerTimer();
+  if (!state.timerEndsAt) return;
+  const delay = Math.max(0, state.timerEndsAt - Date.now());
+  answerTimer = setTimeout(() => {
+    try {
+      if (state.phase === 'answering') {
+        state = endAnsweringWithForces(state);
+        broadcast();
+        scheduleEliminationSequence();
+      }
+    } catch {
+      // ignore
+    }
+  }, delay + 50);
+}
+
+function scheduleEliminationSequence() {
+  clearElimTimers();
+  if (state.phase !== 'eliminating' || state.elimination?.stage !== 'search') return;
+
+  const delay = Math.max(0, (state.elimination.searchEndsAt || Date.now()) - Date.now());
+  elimSearchTimer = setTimeout(() => {
+    try {
+      state = finishEliminationSearch(state);
+      broadcast();
+      scheduleNextElimLight(200);
+    } catch {
+      // ignore
+    }
+  }, delay);
+}
+
+function scheduleNextElimLight(delay = ELIM_REVEAL_GAP_MS) {
+  if (elimRevealTimer) clearTimeout(elimRevealTimer);
+  elimRevealTimer = setTimeout(() => {
+    try {
+      if (state.phase !== 'eliminating') return;
+      state = revealNextEliminated(state);
+      broadcast();
+      if (state.phase === 'eliminating') {
+        scheduleNextElimLight(ELIM_REVEAL_GAP_MS);
+      }
+    } catch {
+      // ignore
+    }
+  }, delay);
+}
+
+function clientView(ws) {
+  return sanitizeStateForClient(state, ws.role, ws.playerId ?? null);
+}
+
+function broadcast() {
+  for (const client of clients) {
+    if (client.readyState === 1) {
+      client.send(JSON.stringify({ type: 'state', state: clientView(client) }));
+    }
+  }
+}
+
+function updateConnectionFlags() {
+  state = {
+    ...state,
+    displayConnected: [...clients].some((c) => c.role === 'display'),
+    hostConnected: [...clients].some((c) => c.role === 'host'),
+    playerConnections: [...clients].filter((c) => c.role === 'player').length,
+  };
+}
+
+async function loadQuestionPack(filename) {
+  const safe = path.basename(filename);
+  const filePath = path.join(QUESTIONS_DIR, safe);
+  const raw = await fs.readFile(filePath, 'utf8');
+  const data = JSON.parse(raw);
+  if (!Array.isArray(data.questions)) {
+    throw new Error('Invalid question pack: missing questions array');
+  }
+  const packId = path.basename(safe, '.json');
+  const questions = data.questions.map((q) => ({
+    ...q,
+    image: resolveQuestionImage(q.image, packId),
+  }));
+  return { questions, name: data.name ?? safe, packId };
+}
+
+/** Pack-relative image → /images/questions/<packId>/<file> */
+function resolveQuestionImage(image, packId) {
+  if (!image) return null;
+  const s = String(image).trim();
+  if (!s) return null;
+  if (/^https?:\/\//i.test(s) || s.startsWith('/')) return s;
+  const cleaned = s.replace(/\\/g, '/').replace(/\.\./g, '').replace(/^\/+/, '');
+  if (!cleaned) return null;
+  return `/images/questions/${packId}/${cleaned}`;
+}
+
+async function listQuestionFiles() {
+  const entries = await fs.readdir(QUESTIONS_DIR);
+  return entries.filter((f) => f.endsWith('.json')).sort();
+}
+
+async function listSoundFiles() {
+  const entries = await fs.readdir(SOUNDS_DIR);
+  return entries.filter((f) => /\.(mp3|wav|ogg|m4a)$/i.test(f)).sort();
+}
+
+function requireHost(role) {
+  if (role !== 'host') throw new Error('Host only');
+}
+
+async function handleAction(action, payload = {}, meta = {}) {
+  const role = meta.role || 'host';
+  const playerId = payload.playerId || meta.playerId || null;
+
+  switch (action) {
+    case 'update_setup':
+      requireHost(role);
+      state = applySetup(state, payload.setup ?? {});
+      break;
+
+    case 'join': {
+      const result = joinPlayer(state, { name: payload.name, playerId });
+      state = result.state;
+      return { playerId: result.player.id, player: result.player };
+    }
+
+    case 'remove_player':
+      requireHost(role);
+      state = removePlayer(state, payload.targetId || payload.playerId);
+      break;
+
+    case 'close_lobby':
+      requireHost(role);
+      state = closeLobby(state);
+      break;
+
+    case 'reopen_lobby':
+      requireHost(role);
+      state = reopenLobby(state);
+      break;
+
+    case 'start_game': {
+      requireHost(role);
+      const pack = await loadQuestionPack(state.setup.questionFile);
+      state = startGame(state, pack.questions, pack.name);
+      break;
+    }
+
+    case 'skip_intro':
+      requireHost(role);
+      state = skipIntro(state);
+      if (state.phase === 'question') {
+        // auto-start answering after brief question show? Host triggers.
+      }
+      break;
+
+    case 'show_question':
+      requireHost(role);
+      if (state.phase === 'intro') state = skipIntro(state);
+      else if (state.questionIndex < 0) state = beginQuestion(state, 0);
+      break;
+
+    case 'start_answering':
+      requireHost(role);
+      state = startAnswering(state);
+      scheduleAnswerTimer();
+      break;
+
+    case 'submit_answer':
+      if (role !== 'player' && role !== 'host') throw new Error('Players only');
+      state = submitAnswer(state, playerId, payload.text);
+      break;
+
+    case 'use_pass':
+      if (role !== 'player' && role !== 'host') throw new Error('Players only');
+      state = usePass(state, playerId);
+      break;
+
+    case 'end_answering':
+      requireHost(role);
+      clearAnswerTimer();
+      clearElimTimers();
+      state = endAnsweringWithForces(state);
+      scheduleEliminationSequence();
+      break;
+
+    case 'host_override':
+      requireHost(role);
+      state = hostOverride(state, payload.targetId || payload.playerId, !!payload.correct);
+      break;
+
+    case 'advance':
+      requireHost(role);
+      clearElimTimers();
+      state = advanceAfterReveal(state);
+      if (state.phase === 'answering') scheduleAnswerTimer();
+      break;
+
+    case 'elim_search_done':
+      // Optional early trigger from display when audio ends
+      if (state.phase === 'eliminating' && state.elimination?.stage === 'search') {
+        clearElimTimers();
+        state = finishEliminationSearch(state);
+        scheduleNextElimLight(200);
+      }
+      break;
+
+    case 'cashout_decide':
+      state = cashoutDecide(state, playerId, !!payload.leave);
+      break;
+
+    case 'resolve_cashout':
+      requireHost(role);
+      state = resolveCashout(state);
+      break;
+
+    case 'final_decide':
+      state = finalDecide(state, playerId, !!payload.take10k);
+      break;
+
+    case 'resolve_final':
+      requireHost(role);
+      state = resolveFinalChoice(state);
+      break;
+
+    case 'solo_decide':
+      // Host or the solo player can decide
+      state = soloDecide(state, !!payload.take10k);
+      break;
+
+    case 'clear_sound':
+      state = clearSoundCue(state);
+      break;
+
+    case 'reset_lobby':
+      requireHost(role);
+      clearAnswerTimer();
+      clearElimTimers();
+      state = resetToLobby(state);
+      break;
+
+    case 'new_join_code':
+      requireHost(role);
+      if (state.phase !== 'lobby') throw new Error('Lobby only');
+      state = { ...state, joinCode: createJoinCode() };
+      break;
+
+    default:
+      throw new Error(`Unknown action: ${action}`);
+  }
+
+  return null;
+}
+
+const app = express();
+app.use(express.json({ limit: '1mb' }));
+app.use(express.static(PUBLIC_DIR));
+
+app.get('/api/state', (req, res) => {
+  const role = req.headers['x-client-role'] || req.query.role || 'display';
+  const playerId = req.headers['x-player-id'] || req.query.playerId || null;
+  res.json(sanitizeStateForClient(state, role, playerId));
+});
+
+app.get('/api/question-files', async (_req, res) => {
+  try {
+    res.json({ files: await listQuestionFiles() });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/sound-files', async (_req, res) => {
+  try {
+    res.json({ files: await listSoundFiles() });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/info', (_req, res) => {
+  res.json(networkInfo(PORT));
+});
+
+app.get('/api/qr', async (req, res) => {
+  try {
+    const data = String(req.query.data || '').slice(0, 2048);
+    if (!data) {
+      res.status(400).json({ error: 'data required' });
+      return;
+    }
+    const png = await QRCode.toBuffer(data, {
+      type: 'png',
+      width: Number(req.query.size) || 320,
+      margin: 1,
+      errorCorrectionLevel: 'M',
+      color: { dark: '#031018', light: '#ffffff' },
+    });
+    res.set('Cache-Control', 'public, max-age=60');
+    res.type('png').send(png);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/feedback', async (_req, res) => {
+  try {
+    const raw = await fs.readFile(FEEDBACK_FILE, 'utf8').catch(() => '');
+    const items = raw
+      .split('\n')
+      .filter(Boolean)
+      .map((line) => {
+        try {
+          return JSON.parse(line);
+        } catch {
+          return null;
+        }
+      })
+      .filter(Boolean)
+      .reverse();
+    res.json({ items });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/feedback', async (req, res) => {
+  try {
+    const note = String(req.body?.note ?? '').trim();
+    if (!note) {
+      res.status(400).json({ error: 'Note required' });
+      return;
+    }
+    const entry = {
+      id: `fb_${Date.now().toString(36)}`,
+      at: new Date().toISOString(),
+      screen: String(req.body?.screen || 'unknown').slice(0, 40),
+      type: String(req.body?.type || 'other').slice(0, 40),
+      severity: String(req.body?.severity || 'minor').slice(0, 40),
+      note: note.slice(0, 4000),
+      name: String(req.body?.name || '').slice(0, 80),
+      url: String(req.body?.url || '').slice(0, 500),
+      userAgent: String(req.body?.userAgent || '').slice(0, 300),
+    };
+    await fs.mkdir(path.dirname(FEEDBACK_FILE), { recursive: true });
+    await fs.appendFile(FEEDBACK_FILE, `${JSON.stringify(entry)}\n`, 'utf8');
+    res.json({ ok: true, entry });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/action', async (req, res) => {
+  try {
+    const { action, ...payload } = req.body;
+    const role = req.headers['x-client-role'] || payload.role || 'host';
+    const meta = {
+      role,
+      playerId: req.headers['x-player-id'] || payload.playerId || null,
+    };
+    const extra = await handleAction(action, payload, meta);
+    updateConnectionFlags();
+    broadcast();
+    const view = sanitizeStateForClient(state, role, meta.playerId);
+    res.json({ ok: true, state: view, ...extra });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/', (_req, res) => {
+  res.sendFile(path.join(PUBLIC_DIR, 'index.html'));
+});
+
+const server = createServer(app);
+const wss = new WebSocketServer({ server });
+
+wss.on('connection', (ws, req) => {
+  const url = new URL(req.url, `http://${req.headers.host}`);
+  const roleParam = url.searchParams.get('role') || 'display';
+  ws.role = ['display', 'host', 'player'].includes(roleParam) ? roleParam : 'display';
+  ws.playerId = url.searchParams.get('playerId') || null;
+  clients.add(ws);
+  updateConnectionFlags();
+  ws.send(JSON.stringify({ type: 'state', state: clientView(ws) }));
+  broadcast();
+
+  ws.on('message', async (data) => {
+    try {
+      const msg = JSON.parse(data.toString());
+      if (msg.type === 'action') {
+        await handleAction(msg.action, msg, { role: ws.role, playerId: ws.playerId });
+        updateConnectionFlags();
+        broadcast();
+      } else if (msg.type === 'ping') {
+        ws.send(JSON.stringify({ type: 'pong' }));
+      } else if (msg.type === 'identify') {
+        ws.playerId = msg.playerId || ws.playerId;
+        ws.send(JSON.stringify({ type: 'state', state: clientView(ws) }));
+      }
+    } catch (err) {
+      ws.send(JSON.stringify({ type: 'error', error: err.message }));
+    }
+  });
+
+  ws.on('close', () => {
+    clients.delete(ws);
+    updateConnectionFlags();
+    broadcast();
+  });
+});
+
+server.listen(PORT, '0.0.0.0', async () => {
+  const info = networkInfo(PORT);
+  const files = await listQuestionFiles();
+
+  if (!process.env.RENDER) {
+    try {
+      const bonjour = new Bonjour();
+      bonjour.publish({
+        name: MDNS_NAME,
+        type: 'http',
+        port: PORT,
+      });
+    } catch (err) {
+      console.warn('  mDNS: could not advertise (club.local may not resolve):', err.message);
+    }
+  }
+
+  console.log('');
+  console.log('  The 1% Club — party server');
+  console.log('  ──────────────────────────');
+  console.log('  USE THESE (LAN IP — works on phones):');
+  console.log(`  Home:     ${info.primary}/`);
+  console.log(`  TV:       ${info.display}`);
+  console.log(`  Host:     ${info.host}`);
+  console.log(`  Play:     ${info.play}`);
+  console.log(`  QA:       ${info.qa}`);
+  console.log('');
+  console.log('  On this Mac you can also use:');
+  console.log(`    http://localhost:${PORT}/`);
+  console.log('');
+  console.log('  Note: club.local often hangs on macOS — prefer the IP above.');
+  console.log('');
+  console.log(`  Question packs: ${files.join(', ')}`);
+  console.log('');
+});

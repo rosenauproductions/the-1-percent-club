@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 200" fill="none">
+  <rect width="400" height="200" rx="24" fill="#050b1a"/>
+  <circle cx="200" cy="100" r="70" stroke="#2ee6ff" stroke-width="3" opacity="0.35"/>
+  <circle cx="200" cy="100" r="48" stroke="#2ee6ff" stroke-width="2" opacity="0.55"/>
+  <text x="200" y="88" text-anchor="middle" fill="#f4f8ff" font-family="Arial Black, Arial, sans-serif" font-size="28" letter-spacing="4">THE</text>
+  <text x="200" y="128" text-anchor="middle" fill="#2ee6ff" font-family="Arial Black, Arial, sans-serif" font-size="42" letter-spacing="2">1%</text>
+  <text x="200" y="158" text-anchor="middle" fill="#8aa0c8" font-family="Arial, sans-serif" font-size="16" letter-spacing="6">CLUB</text>
+</svg>
