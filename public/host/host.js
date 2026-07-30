@@ -116,17 +116,31 @@ function renderQuestion() {
   const active = activePlayers();
   const answering = state.phase === 'answering';
   const secs = state.timerEndsAt ? Math.max(0, Math.ceil((state.timerEndsAt - Date.now()) / 1000)) : null;
+  const isOnePercent = q?.percent === 1 || state.questionIndex === 14;
 
   main.innerHTML = `
     <div class="card">
-      <h2><span class="badge">${q?.percent}%</span> Question ${(state.questionIndex ?? 0) + 1}/15</h2>
+      <h2><span class="badge">${q?.percent}%</span> ${
+        isOnePercent ? '1% question' : `Question ${(state.questionIndex ?? 0) + 1}/15`
+      }</h2>
+      ${
+        !answering
+          ? `<p class="muted" style="margin-bottom:0.5rem">${
+              isOnePercent
+                ? `${active.length} finalist${active.length === 1 ? '' : 's'} · TV is waiting — talk, then start`
+                : 'Only you can see this. Talk to the room, then start when ready.'
+            }</p>`
+          : ''
+      }
       <p style="font-weight:700;line-height:1.35">${escapeHtml(q?.prompt || '')}</p>
       <p class="muted" style="margin-top:0.5rem">Accepted: ${(q?.accepted || []).map(escapeHtml).join(' · ')}</p>
       ${answering ? `<p class="muted">${lockedCount()} / ${active.length} locked · ${secs ?? '—'}s</p>` : ''}
       <div class="stack" style="margin-top:0.85rem">
         ${
           !answering
-            ? `<button class="btn-primary big-btn" data-act="start_answering">Start 30s timer</button>`
+            ? `<button class="btn-primary big-btn" data-act="start_answering">${
+                isOnePercent ? 'Show 1% question & start timer' : 'Show question & start timer'
+              }</button>`
             : `<button class="btn-gold big-btn" data-act="end_answering">Force reveal now</button>`
         }
       </div>
@@ -143,7 +157,12 @@ function renderQuestion() {
                 })
                 .join('')}
             </ul></div>`
-        : ''
+        : `<div class="card"><h2>Still in</h2>
+            <ul class="answer-list">
+              ${active
+                .map((p) => `<li><div class="name">${escapeHtml(p.name)}</div></li>`)
+                .join('') || '<li><div class="text">Nobody left</div></li>'}
+            </ul></div>`
     }
     <button class="btn-danger" data-act="reset_lobby">Reset to lobby</button>
   `;
@@ -202,8 +221,9 @@ function renderFinal() {
   const active = activePlayers();
   main.innerHTML = `
     <div class="card">
-      <h2>$10k or 1%?</h2>
-      <p class="muted">Jackpot ${money(state.jackpot)}</p>
+      <h2>Finalists · $10k or 1%?</h2>
+      <p class="muted">${active.length} left · jackpot ${money(state.jackpot)}</p>
+      <p class="muted">Anyone who goes for 1% plays the last question — one player or many.</p>
       <ul class="answer-list">
         ${active
           .map((p) => {
@@ -213,7 +233,7 @@ function renderFinal() {
           })
           .join('')}
       </ul>
-      <button class="btn-primary big-btn" style="margin-top:0.85rem" data-act="resolve_final">Resolve & continue</button>
+      <button class="btn-primary big-btn" style="margin-top:0.85rem" data-act="resolve_final">Lock in & go to 1%</button>
     </div>
   `;
 }
@@ -234,6 +254,16 @@ function renderSolo() {
 }
 
 function renderFinale() {
+  if (state.phase === 'game_end') {
+    main.innerHTML = `
+      <div class="card">
+        <h2>No one got to the 1% question</h2>
+        <p class="muted">Jackpot ${money(state.jackpot)} unclaimed.</p>
+        <button class="btn-primary big-btn" style="margin-top:0.85rem" data-act="reset_lobby">New game</button>
+      </div>
+    `;
+    return;
+  }
   const winners = state.players.filter((p) => ['winner', 'took10k', 'cashed'].includes(p.status));
   main.innerHTML = `
     <div class="card">

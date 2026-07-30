@@ -1,4 +1,4 @@
-/** @typedef {'lobby'|'intro'|'question'|'answering'|'reveal'|'cashout_offer'|'final_choice'|'solo_offer'|'finale'|'game_end'} Phase */
+/** @typedef {'lobby'|'intro'|'question'|'answering'|'eliminating'|'reveal'|'cashout_offer'|'final_choice'|'solo_offer'|'finale'|'game_end'} Phase */
 /** @typedef {'active'|'out'|'cashed'|'took10k'|'winner'} PlayerStatus */
 
 export const STAKE = 1000;
@@ -151,12 +151,36 @@ export function sanitizeStateForClient(state, role, playerId = null) {
     }
   }
 
+  // Host-only preview: TV/players see percent + seats, not the prompt, until Start.
+  if (role !== 'host' && state.phase === 'question' && base.currentQuestion) {
+    base.currentQuestion = {
+      index: base.currentQuestion.index,
+      percent: base.currentQuestion.percent,
+      promptHidden: true,
+    };
+  }
+
   if (role === 'player' && playerId) {
     base.me = publicPlayers(state.players).find((p) => p.id === playerId) ?? null;
     base.myAnswer = state.answers[playerId] ?? null;
   }
 
   return base;
+}
+
+/** Mark every still-active contestant as a 1% Club winner and split the jackpot. */
+function awardOnePercentWinners(state) {
+  const survivors = state.players.filter((p) => p.status === 'active');
+  if (!survivors.length) return state;
+  const share = Math.floor(state.jackpot / survivors.length);
+  return {
+    ...state,
+    players: state.players.map((p) => {
+      if (p.status !== 'active') return p;
+      const keep = !p.stakeInJackpot ? STAKE : 0;
+      return { ...p, status: 'winner', winnings: share + keep };
+    }),
+  };
 }
 
 export function applySetup(state, setup) {
@@ -349,12 +373,14 @@ export function beginQuestion(state, questionIndex) {
     answeringStartedAt: null,
     answers: {},
     reveal: null,
+    elimination: null,
     pendingAfterReveal: null,
     _cashoutDone: questionIndex >= CASHOUT_QUESTION_INDEX ? true : next._cashoutDone,
     _awaitingQuestionIndex: undefined,
   };
 
-  return actionMeta(cue(next, 'timer'), 'begin_question', { questionIndex });
+  // Host talk / banter bed — question + answer music wait for Start.
+  return actionMeta(cue(next, 'interlude'), 'begin_question', { questionIndex });
 }
 
 export function startAnswering(state) {
@@ -364,12 +390,15 @@ export function startAnswering(state) {
   const seconds = state.setup.answerSeconds || ANSWER_SECONDS;
   const now = Date.now();
   return actionMeta(
-    {
-      ...state,
-      phase: 'answering',
-      answeringStartedAt: now,
-      timerEndsAt: now + seconds * 1000,
-    },
+    cue(
+      {
+        ...state,
+        phase: 'answering',
+        answeringStartedAt: now,
+        timerEndsAt: now + seconds * 1000,
+      },
+      'timer',
+    ),
     'start_answering',
   );
 }
@@ -405,7 +434,7 @@ export function submitAnswer(state, playerId, text) {
 }
 
 export function usePass(state, playerId) {
-  if (state.phase !== 'answering' && state.phase !== 'question') {
+  if (state.phase !== 'answering') {
     throw new Error('Cannot pass now');
   }
   if (state.questionIndex === ONE_PERCENT_INDEX) {
@@ -693,17 +722,6 @@ function finalizeElimination(state) {
     soundCue: null,
   };
 
-  // 1% winners / pending already set; apply finale money if needed
-  if (next.pendingAfterReveal === 'finale' && state.questionIndex === ONE_PERCENT_INDEX) {
-    const survivors = next.players.filter((p) => p.status === 'active');
-    const share = survivors.length ? Math.floor(next.jackpot / survivors.length) : 0;
-    next.players = next.players.map((p) => {
-      if (p.status !== 'active') return p;
-      const keep = !p.stakeInJackpot ? STAKE : 0;
-      return { ...p, status: 'winner', winnings: share + keep };
-    });
-  }
-
   return actionMeta(next, 'elim_done');
 }
 
@@ -721,7 +739,12 @@ export function advanceAfterReveal(state) {
     return actionMeta({ ...state, phase: 'game_end', soundCue: null }, 'game_end');
   }
   if (pending === 'finale') {
-    return actionMeta(cue({ ...state, phase: 'finale' }, 'win'), 'finale');
+    let next = { ...state, phase: 'finale' };
+    // Clean or messy 1% round — any remaining contestants split the jackpot
+    if (state.questionIndex === ONE_PERCENT_INDEX) {
+      next = awardOnePercentWinners(next);
+    }
+    return actionMeta(cue(next, 'win'), 'finale');
   }
   if (pending === 'solo_offer') {
     return actionMeta(

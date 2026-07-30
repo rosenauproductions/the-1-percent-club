@@ -165,8 +165,42 @@ function renderQuestion() {
   const active = state.players.filter((p) => p.status === 'active');
   const locked = Object.values(state.answers || {}).filter((a) => a.locked).length;
   const answering = state.phase === 'answering';
-  const hasImage = !!q?.image;
-  const hasChoices = Array.isArray(q?.choices) && q.choices.length > 0;
+  const promptHidden = !answering && (!!q?.promptHidden || !q?.prompt);
+  const isOnePercent = q?.percent === 1 || state.questionIndex === 14;
+  const hasImage = !!q?.image && !promptHidden;
+  const hasChoices = !promptHidden && Array.isArray(q?.choices) && q.choices.length > 0;
+
+  // Host talk beat — seats + percent only; question waits for Start.
+  if (promptHidden) {
+    const names = active.map((p) => escapeHtml(p.name)).join(' · ');
+    main.innerHTML = `
+      <div class="question-layout">
+        <div class="question-panel host-hold">
+          <div class="pct-badge">${q?.percent ?? '?'}%${
+            isOnePercent
+              ? '<small>THE FINAL QUESTION</small>'
+              : '<small>NEXT QUESTION</small>'
+          }</div>
+          <div class="host-hold__body">
+            <h2 class="host-hold__title">${
+              isOnePercent
+                ? 'WELCOME, <span class="pct">FINALISTS</span>'
+                : 'OVER TO THE <span class="pct">HOST</span>'
+            }</h2>
+            <p class="host-hold__copy">${
+              isOnePercent
+                ? `${active.length} contestant${active.length === 1 ? '' : 's'} left for the 1% question.`
+                : "Talk through the last answer, check who's still in, then start when ready."
+            }</p>
+            ${names ? `<p class="host-hold__names">${names}</p>` : ''}
+            <div class="lock-progress">Waiting for host to start…</div>
+          </div>
+        </div>
+        <div class="side-grid">${renderSeatGrid(state.players)}</div>
+      </div>
+    `;
+    return;
+  }
 
   main.innerHTML = `
     <div class="question-layout">
@@ -181,12 +215,8 @@ function renderQuestion() {
           }
           ${hasChoices ? `<div class="q-area-choices">${renderChoices(q.choices)}</div>` : '<div class="q-area-choices"></div>'}
           <div class="q-area-meta">
-            ${
-              answering
-                ? `<div class="timer ${secs !== null && secs <= 5 ? 'warn' : ''}" id="tvTimer">${secs ?? '—'}</div>
-                   <div class="lock-progress">${locked} / ${active.length} locked in</div>`
-                : `<div class="lock-progress">Get ready…</div>`
-            }
+            <div class="timer ${secs !== null && secs <= 5 ? 'warn' : ''}" id="tvTimer">${secs ?? '—'}</div>
+            <div class="lock-progress">${locked} / ${active.length} locked in</div>
           </div>
         </div>
       </div>
@@ -299,11 +329,13 @@ function renderCashout() {
 }
 
 function renderFinalChoice() {
+  const active = state.players.filter((p) => p.status === 'active');
   main.innerHTML = `
     <div class="center-phase">
       <h1>TAKE <span class="pct">$10,000</span> OR GO FOR <span class="pct">1%</span>?</h1>
-      <p>Jackpot sits at ${money(state.jackpot)}. Survivors choose.</p>
-      <div class="side-grid" style="width:70%;max-height:40%">${renderSeatGrid(state.players.filter((p) => p.status === 'active'))}</div>
+      <p>${active.length} finalist${active.length === 1 ? '' : 's'} · jackpot ${money(state.jackpot)}</p>
+      <p>Anyone who stays faces the 1% question — one player or a full table.</p>
+      <div class="side-grid" style="width:70%;max-height:40%">${renderSeatGrid(active)}</div>
     </div>
   `;
 }
@@ -343,7 +375,7 @@ function renderFinale() {
 function renderGameEnd() {
   main.innerHTML = `
     <div class="center-phase">
-      <h1>NOBODY LEFT</h1>
+      <h1>No one got to the <span class="pct">1%</span> question</h1>
       <p>The jackpot of ${money(state.jackpot)} goes unclaimed.</p>
     </div>
   `;
@@ -394,7 +426,7 @@ function render() {
 async function handleSoundCue(cue) {
   if (!cue || cue.at === lastSoundAt) return;
   lastSoundAt = cue.at;
-  const looping = cue.name === 'intro';
+  const looping = cue.name === 'intro' || cue.name === 'interlude';
   if (!looping) stopAllMusic();
   const audio = await playSound(cue.name, { loop: looping });
   if (cue.name === 'eliminating' && audio) {

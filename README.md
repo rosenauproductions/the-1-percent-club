@@ -55,8 +55,8 @@ Same pattern as Family Feud: a **Node web service** (HTTP + WebSockets) on Rende
 1. Open **display** on the TV and **host** on your phone.
 2. Players open **play** (QR on the TV or the join code).
 3. Host picks a question pack, closes join when ready, and starts the game.
-4. Each question: host starts the timer → players lock answers (or use a pass) → auto/forced reveal → host continues.
-5. Special beats match the US show: passes before **50%**, cash-out before **30%**, $10k vs **1%** after **5%**, solo $10k offer if one player remains early.
+4. Each question: host talks (TV holds) → host starts → question + timer music → lock answers → reveal → continue.
+5. Special beats match the US show: passes before **50%**, cash-out before **30%**, $10k vs **1%** after **5%** (any number of remaining contestants can attempt 1%), solo $10k offer if one player remains early.
 
 Player count is flexible: whoever joins during lobby (soft cap **100**). Each starts with a **$1,000** play-money stake; wrong answers / passes feed the jackpot.
 
@@ -67,7 +67,8 @@ Placeholder tones live in `public/sounds/`. Drop your own files with the same na
 | File | Cue |
 |------|-----|
 | `intro.mp3` | Game start / intro |
-| `timer.mp3` | Question appears |
+| `interlude.mp3` | Between questions — host talk bed (loops until Start) |
+| `timer.mp3` | Host starts the question / answer window |
 | `lock.mp3` | Answer locked |
 | `correct.mp3` | Clean round |
 | `eliminating.mp3` | Blue-light search (TV + phones) |

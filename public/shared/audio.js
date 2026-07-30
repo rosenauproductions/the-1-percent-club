@@ -1,5 +1,6 @@
 const DEFAULT_SOUNDS = {
   intro: 'intro.mp3',
+  interlude: 'interlude.mp3',
   timer: 'timer.mp3',
   lock: 'lock.mp3',
   correct: 'correct.mp3',

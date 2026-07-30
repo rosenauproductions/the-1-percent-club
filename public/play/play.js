@@ -207,10 +207,17 @@ function renderAnswering() {
 
   if (state.phase === 'question') {
     answeringViewKey = '';
+    const isOnePercent = q?.percent === 1 || state.questionIndex === 14;
     main.innerHTML = `
-      <div class="pct">${q?.percent}%</div>
-      <p class="prompt">${escapeHtml(q?.prompt || '')}</p>
-      <p class="muted">Get ready…</p>
+      <div class="pct">${q?.percent ?? '?'}%</div>
+      <div class="hero" style="margin-top:1rem">
+        <h1>${isOnePercent ? 'Finalist' : 'Host time'}</h1>
+        <p class="muted">${
+          isOnePercent
+            ? "You're still in for the 1% question. Listen to the host — it starts when they hit Start."
+            : 'Listen to the host. The question appears when they start the timer.'
+        }</p>
+      </div>
     `;
     return;
   }
