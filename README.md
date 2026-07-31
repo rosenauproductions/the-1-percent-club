@@ -72,7 +72,7 @@ Placeholder tones live in `public/sounds/`. Drop your own files with the same na
 | `lock.mp3` | Unused (kept for optional custom wiring) |
 | `correct.mp3` | After clean-round TV sting |
 | `thump.mp3` | `/play` only — sting before each non-last wrong blue light; audio test |
-| `eliminating.mp3` | TV only — clean round or **last** wrong (plays 1–3× randomly) |
+| `eliminating.mp3` | TV — clean round or **last** wrong (1–3×); also in `/play` audio test |
 | `eliminate.mp3` | Each wrong player lit (after sting) |
 | `youre-out.mp3` | Personal out sting (eliminated phone) |
 | `pass.mp3` | Pass / cash-out moments |

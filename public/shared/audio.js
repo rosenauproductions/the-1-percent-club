@@ -247,10 +247,11 @@ export async function playSoundTimes(name, times, options = {}) {
   }
 }
 
-/** Audible confirmation for volume-gate / QA test (phone-only thump.mp3). */
+/** Audible confirmation for volume-gate / QA test (thump + eliminating). */
 export async function playTestTone() {
   await activateAudio();
   if (!audioActivated) return false;
   await playSoundUntilEnded('thump', { volume: 1 });
+  await playSoundUntilEnded('eliminating', { volume: 1 });
   return true;
 }

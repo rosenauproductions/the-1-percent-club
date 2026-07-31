@@ -82,7 +82,7 @@ export function mountQaWidget(screenName, options = {}) {
         <button type="button" class="qa-audio-btn" id="qaUnlockAudio">Unlock</button>
         <button type="button" class="qa-audio-btn qa-audio-btn--primary" id="qaTestAudio">Test sound</button>
       </div>
-      <p class="qa-audio-hint">On phones: unlock/test must be a tap. You should hear thump.mp3.</p>
+      <p class="qa-audio-hint">On phones: unlock/test must be a tap. You should hear thump.mp3 then eliminating.mp3.</p>
     </div>`
         : ''
     }
