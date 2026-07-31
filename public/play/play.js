@@ -675,8 +675,10 @@ function handlePlayerSoundCue(cue) {
   lastPlaySoundAt = cue.at;
   noteSoundCue(cue);
 
-  // TV-only — phones never play eliminating.mp3
-  if (cue.audience === 'display' || cue.name === 'eliminating') {
+  // eliminating.mp3 on phones too (full blast) — clean round / last wrong
+  if (cue.name === 'eliminating') {
+    const times = cue.times || state?.elimination?.stingTimes || 1;
+    playSoundTimes('eliminating', times, { volume: 1 }).catch(() => {});
     return;
   }
 
@@ -684,6 +686,10 @@ function handlePlayerSoundCue(cue) {
   if (cue.name === 'thump') {
     const times = cue.times || 1;
     playSoundTimes('thump', times, { volume: 1 }).catch(() => {});
+    return;
+  }
+
+  if (cue.audience === 'display') {
     return;
   }
 

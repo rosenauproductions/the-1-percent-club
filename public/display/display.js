@@ -500,7 +500,7 @@ async function handleSoundCue(cue) {
     return;
   }
 
-  // TV-only: eliminating.mp3 × 1–3 (clean round or last wrong), then advance
+  // eliminating.mp3 × 1–3 (clean round or last wrong; phones play too), then advance
   if (cue.name === 'eliminating') {
     const times = cue.times || state?.elimination?.stingTimes || 1;
     await playSoundTimes('eliminating', times, { volume: 0.5 });

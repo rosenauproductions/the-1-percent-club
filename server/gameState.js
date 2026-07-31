@@ -674,7 +674,7 @@ export function showResults(state) {
           },
         },
         'eliminating',
-        { times, audience: 'display' },
+        { times, audience: 'all' },
       ),
       'show_results_clean_sting',
       { times },
@@ -731,7 +731,7 @@ export function enterAnswerReveal(state) {
 
 /**
  * Sting before the next blue light.
- * Non-last wrong → thump on phones. Last wrong → eliminating × 1–3 on TV.
+ * Non-last wrong → thump on phones. Last wrong → eliminating × 1–3 on phones + TV.
  */
 export function startEliminationSting(state) {
   if (state.phase !== 'eliminating') throw new Error('Not eliminating');
@@ -747,7 +747,8 @@ export function startEliminationSting(state) {
   const isLast = remaining.length === 1;
   const times = isLast ? 1 + Math.floor(Math.random() * 3) : 1;
   const soundName = isLast ? 'eliminating' : 'thump';
-  const audience = isLast ? 'display' : 'play';
+  // thump = phones only; eliminating = phones + TV
+  const audience = isLast ? 'all' : 'play';
 
   return actionMeta(
     cue(
