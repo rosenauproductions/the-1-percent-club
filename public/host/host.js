@@ -106,7 +106,7 @@ function renderIntro() {
       <h2>Intro</h2>
       <p class="muted">${state.players.length} players ready</p>
       <p style="margin:0.65rem 0 0;font-weight:700;line-height:1.4">
-        Intro music is at <span style="color:var(--club-gold,#ffd54a)">50%</span> — talk about the game, then begin.
+        Intro music is at <span style="color:var(--club-gold,#ffd54a)">20%</span> — talk about the game, then begin.
       </p>
       <button class="btn-primary big-btn" style="margin-top:0.85rem" data-act="skip_intro">Begin questions</button>
     </div>
@@ -308,10 +308,18 @@ function render() {
     case 'answering':
       renderQuestion();
       break;
+    case 'eliminated_count':
+      main.innerHTML = `
+        <div class="card">
+          <h2>${state.reveal?.eliminated ?? 0} eliminated</h2>
+          <p class="muted">TV is showing how many went out this round.</p>
+          <button class="btn-primary big-btn" style="margin-top:0.85rem" data-act="advance">Show who remains</button>
+        </div>`;
+      break;
     case 'left_count':
       main.innerHTML = `
         <div class="card">
-          <h2>${activePlayers().length} left</h2>
+          <h2>${activePlayers().length} remain</h2>
           <p class="muted">TV is showing how many contestants remain.</p>
           <button class="btn-primary big-btn" style="margin-top:0.85rem" data-act="advance">Show prize pot</button>
         </div>`;
@@ -321,7 +329,7 @@ function render() {
         <div class="card">
           <h2>Prize pot · ${money(state.jackpot)}</h2>
           <p class="muted">TV jackpot board is up.</p>
-          <button class="btn-primary big-btn" style="margin-top:0.85rem" data-act="advance">Show correct answer</button>
+          <button class="btn-primary big-btn" style="margin-top:0.85rem" data-act="advance">Next question</button>
         </div>`;
       break;
     case 'reveal':
@@ -333,7 +341,7 @@ function render() {
         main.innerHTML = `
           <div class="card">
             <h2>Round over</h2>
-            <p class="muted">TV/phones looping eliminating.mp3 (${state.elimination?.pendingLoops || 1}× bursts) until you show who is out.</p>
+            <p class="muted">Round up — TV holding. When ready, show wrong players (eliminating × 1–3, then thumps).</p>
             <ul class="answer-list" style="margin-top:0.75rem">
               ${(r?.results || [])
                 .map(
@@ -344,18 +352,21 @@ function render() {
                 )
                 .join('')}
             </ul>
-            <button class="btn-primary big-btn" style="margin-top:0.85rem" data-act="show_results">Show who is right and wrong</button>
+            <button class="btn-primary big-btn" style="margin-top:0.85rem" data-act="show_results">Show wrong players</button>
           </div>`;
       } else {
         const stage = state.elimination?.stage;
-        const sting = stage === 'sting' || stage === 'clean_sting';
+        const scanning = stage === 'scanning';
+        const sting = stage === 'sting';
         main.innerHTML = `
           <div class="card">
             <h2>Elimination</h2>
             <p class="muted">${
-              sting
-                ? `Scanning… thump (TV + phones)`
-                : `Lighting out ${state.elimination?.revealedCount || 0} / ${state.elimination?.wrongIds?.length || 0}`
+              scanning
+                ? `TV eliminating.mp3 × ${state.elimination?.stingTimes || 1} — phones flashing`
+                : sting
+                  ? `Thump sequence (TV + phones)`
+                  : `Lighting out ${state.elimination?.revealedCount || 0} / ${state.elimination?.wrongIds?.length || 0}`
             }</p>
             <p class="muted">Wait for the sequence to finish, then continue.</p>
           </div>`;

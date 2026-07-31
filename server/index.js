@@ -21,13 +21,11 @@ import {
   endAnsweringWithForces,
   showResults,
   finishEliminationSting,
-  finishCleanSting,
+  finishScanningSting,
   continueElimination,
   advanceAfterReveal,
   ELIM_STING_MS,
   THUMP_MS,
-  LEFT_COUNT_MS,
-  PRIZE_POT_MS,
   hostOverride,
   cashoutDecide,
   resolveCashout,
@@ -102,10 +100,12 @@ function scheduleElimStingFallback() {
   elimRevealTimer = setTimeout(() => {
     try {
       if (state.phase !== 'eliminating') return;
-      if (state.elimination?.stage === 'clean_sting') {
-        state = finishCleanSting(state);
+      if (state.elimination?.stage === 'scanning' || state.elimination?.stage === 'clean_sting') {
+        state = finishScanningSting(state);
         broadcast();
-        schedulePostElimBoards();
+        if (state.phase === 'eliminating' && state.elimination?.stage === 'sting') {
+          scheduleElimStingFallback();
+        }
         return;
       }
       if (state.elimination?.stage !== 'sting') return;
@@ -140,31 +140,9 @@ function scheduleAfterElimLight(delay = nextThumpGap()) {
   }, delay);
 }
 
-/** Auto: left count → prize pot → answer reveal */
+/** Boards are host-advanced (eliminated → remain → jackpot → next Q). */
 function schedulePostElimBoards() {
-  if (elimRevealTimer) clearTimeout(elimRevealTimer);
-  if (state.phase === 'left_count') {
-    elimRevealTimer = setTimeout(() => {
-      try {
-        if (state.phase !== 'left_count') return;
-        state = advanceAfterReveal(state);
-        broadcast();
-        schedulePostElimBoards();
-      } catch {
-        // ignore
-      }
-    }, LEFT_COUNT_MS);
-  } else if (state.phase === 'prize_pot') {
-    elimRevealTimer = setTimeout(() => {
-      try {
-        if (state.phase !== 'prize_pot') return;
-        state = advanceAfterReveal(state);
-        broadcast();
-      } catch {
-        // ignore
-      }
-    }, PRIZE_POT_MS);
-  }
+  // no auto-advance
 }
 
 function clientView(ws) {
@@ -336,18 +314,25 @@ async function handleAction(action, payload = {}, meta = {}) {
       state = showResults(state);
       if (
         state.phase === 'eliminating' &&
-        (state.elimination?.stage === 'sting' || state.elimination?.stage === 'clean_sting')
+        (state.elimination?.stage === 'scanning' ||
+          state.elimination?.stage === 'sting' ||
+          state.elimination?.stage === 'clean_sting')
       ) {
         scheduleElimStingFallback();
       }
       break;
 
     case 'elim_sting_done':
-      // TV finished thump / eliminating sting — advance
-      if (state.phase === 'eliminating' && state.elimination?.stage === 'clean_sting') {
+      // TV finished eliminating (scanning) or thump — advance
+      if (
+        state.phase === 'eliminating' &&
+        (state.elimination?.stage === 'scanning' || state.elimination?.stage === 'clean_sting')
+      ) {
         clearElimTimers();
-        state = finishCleanSting(state);
-        schedulePostElimBoards();
+        state = finishScanningSting(state);
+        if (state.phase === 'eliminating' && state.elimination?.stage === 'sting') {
+          scheduleElimStingFallback();
+        }
       } else if (state.phase === 'eliminating' && state.elimination?.stage === 'sting') {
         clearElimTimers();
         state = finishEliminationSting(state);

@@ -197,6 +197,24 @@ input[type='text'] {
   color: var(--text-muted);
 }
 
+/* All phones — cycle normal / darkened / blue while TV plays eliminating.mp3 */
+body.elim-scanning {
+  animation: elim-scan-cycle 1.1s ease-in-out infinite;
+}
+
+@keyframes elim-scan-cycle {
+  0%,
+  100% {
+    background: radial-gradient(ellipse at 50% 0%, rgba(61, 255, 154, 0.28), #071a12 55%, #020617 100%);
+  }
+  33% {
+    background: #020617;
+  }
+  66% {
+    background: radial-gradient(ellipse at 50% 35%, rgba(90, 150, 255, 0.55), #0a1a3a 50%, #020617 100%);
+  }
+}
+
 /* Quick blue flash when this contestant is lit wrong */
 body.elim-flash {
   animation: play-elim-flash 0.45s ease-out;

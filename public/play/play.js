@@ -6,7 +6,6 @@ import {
   playTestTone,
   noteSoundCue,
   isAudioActivated,
-  playEliminatingUntilStopped,
   stopPendingEliminating,
 } from '../shared/audio.js';
 
@@ -448,7 +447,7 @@ function render() {
 
   const p = me();
   if (!p || (p.status !== 'out' && state?.phase !== 'eliminating')) {
-    document.body.classList.remove('is-eliminated', 'elim-searching');
+    document.body.classList.remove('is-eliminated', 'elim-searching', 'elim-scanning');
   }
   syncEliminationUi(p);
 
@@ -474,21 +473,24 @@ function render() {
       return;
     }
     const pending = elim.stage === 'pending';
-    const sting = elim.stage === 'sting' || elim.stage === 'clean_sting';
+    const scanning = elim.stage === 'scanning';
+    const sting = elim.stage === 'sting';
     main.innerHTML = `
       <div class="hero">
         <div class="status-pill">${
-          pending ? 'TIME UP' : sting ? 'SEARCHING' : 'HOLDING'
+          pending ? 'TIME UP' : scanning || sting ? 'SEARCHING' : 'HOLDING'
         }</div>
         <h1 style="margin-top:1rem">${escapeHtml(p.name)}</h1>
         <p class="muted">${
           pending
-            ? 'Watch the TV — host will show who is right and wrong'
-            : sting
+            ? 'Watch the TV — host will show wrong players'
+            : scanning
               ? 'Blue lights are scanning…'
-              : elim.wrongIds?.includes(p.id)
-                ? 'Waiting for the blue light…'
-                : 'You survived this round — hang tight'
+              : sting
+                ? 'Blue lights are scanning…'
+                : elim.wrongIds?.includes(p.id)
+                  ? 'Waiting for the blue light…'
+                  : 'You survived this round — hang tight'
         }</p>
       </div>
     `;
@@ -525,11 +527,19 @@ function render() {
     case 'solo_offer':
       renderSolo();
       break;
+    case 'eliminated_count':
+      main.innerHTML = `
+        <div class="hero">
+          <div class="status-pill">OUT</div>
+          <h1 style="margin-top:1rem">${state.reveal?.eliminated ?? 0} eliminated</h1>
+          <p class="muted">Watch the TV</p>
+        </div>`;
+      break;
     case 'left_count':
       main.innerHTML = `
         <div class="hero">
           <div class="status-pill">STILL IN</div>
-          <h1 style="margin-top:1rem">${state.players.filter((x) => x.status === 'active').length} left</h1>
+          <h1 style="margin-top:1rem">${state.players.filter((x) => x.status === 'active').length} remain</h1>
           <p class="muted">Watch the TV</p>
         </div>`;
       break;
@@ -654,9 +664,12 @@ let lastFlashCurrentId = null;
 
 function syncEliminationUi(p) {
   const elim = state?.elimination;
+  // All phones flash normal / dark / blue while TV plays eliminating.mp3
+  const scanning =
+    state?.phase === 'eliminating' && elim?.stage === 'scanning' && !!p;
   const searching =
     state?.phase === 'eliminating' &&
-    (elim?.stage === 'sting' || elim?.stage === 'clean_sting') &&
+    elim?.stage === 'sting' &&
     p?.status === 'active';
   const amLit = !!(
     p &&
@@ -668,7 +681,8 @@ function syncEliminationUi(p) {
     p &&
     elim.currentId === p.id;
 
-  document.body.classList.toggle('elim-searching', !!searching);
+  document.body.classList.toggle('elim-scanning', !!scanning);
+  document.body.classList.toggle('elim-searching', !!searching && !scanning);
   document.body.classList.toggle('is-eliminated', !!(amLit && p?.status === 'out'));
 
   // Quick blue flash when this phone is lit wrong
@@ -698,27 +712,17 @@ function handlePlayerSoundCue(cue) {
   lastPlaySoundAt = cue.at;
   noteSoundCue(cue);
 
-  // Pending hold — eliminating in 1× or 3× bursts until host shows who is out
-  if (cue.name === 'eliminating') {
-    const vol = typeof cue.volume === 'number' ? cue.volume : 1;
-    const times = cue.times || state?.elimination?.pendingLoops || 1;
-    if (cue.loop) {
-      playEliminatingUntilStopped({ times, volume: vol }).catch(() => {});
-      return;
-    }
-    playSoundTimes('eliminating', times, { volume: vol }).catch(() => {});
+  // TV-only eliminating during show-wrongs — phones just flash via elim-scanning
+  if (cue.name === 'eliminating' || cue.audience === 'display') {
+    stopPendingEliminating();
     return;
   }
 
-  // thump on phones (louder mp3); TV also plays
+  // thump on phones; TV also plays
   if (cue.name === 'thump') {
     stopPendingEliminating();
     const times = cue.times || 1;
     playSoundTimes('thump', times, { volume: 1 }).catch(() => {});
-    return;
-  }
-
-  if (cue.audience === 'display') {
     return;
   }
 
@@ -748,10 +752,16 @@ function onState(next) {
   hideBoot();
   if (
     prevPhase === 'eliminating' &&
-    (next.phase === 'left_count' || next.phase === 'prize_pot' || next.phase === 'reveal') &&
+    (next.phase === 'eliminated_count' ||
+      next.phase === 'left_count' ||
+      next.phase === 'prize_pot' ||
+      next.phase === 'reveal') &&
     !next.soundCue
   ) {
     stopPendingEliminating();
+  }
+  if (next.phase !== 'eliminating') {
+    document.body.classList.remove('elim-scanning');
   }
   if (next.soundCue) noteSoundCue(next.soundCue);
   const p = me();

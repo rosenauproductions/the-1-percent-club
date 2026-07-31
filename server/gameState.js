@@ -1,4 +1,4 @@
-/** @typedef {'lobby'|'intro'|'question'|'answering'|'eliminating'|'left_count'|'prize_pot'|'reveal'|'cashout_offer'|'final_choice'|'solo_offer'|'finale'|'game_end'} Phase */
+/** @typedef {'lobby'|'intro'|'question'|'answering'|'eliminating'|'eliminated_count'|'left_count'|'prize_pot'|'reveal'|'cashout_offer'|'final_choice'|'solo_offer'|'finale'|'game_end'} Phase */
 /** @typedef {'active'|'out'|'cashed'|'took10k'|'winner'} PlayerStatus */
 
 export const STAKE = 1000;
@@ -103,7 +103,13 @@ export function createInitialState() {
     finalDecisions: {},
     soloDecision: null,
     lastAction: null,
-    soundCue: null,
+    // TV lobby bed until host starts the game
+    soundCue: {
+      name: 'interlude',
+      at: Date.now(),
+      loop: true,
+      audience: 'display',
+    },
     pendingAfterReveal: null,
   };
 }
@@ -332,7 +338,7 @@ export function startGame(state, questions, packName = null) {
   };
 
   // Soft loop so the host can talk over the show open before questions.
-  next = cue(next, 'intro', { loop: true, volume: 0.5 });
+  next = cue(next, 'intro', { loop: true, volume: 0.2 });
   next = actionMeta(next, 'start_game');
   next.phase = state.setup.skipIntro ? 'question' : 'intro';
 
@@ -404,7 +410,7 @@ export function beginQuestion(state, questionIndex) {
   // After intro talk, first-question hold keeps a soft one-shot bed; later holds are silent.
   if (questionIndex === 0) {
     return actionMeta(
-      cue(next, 'intro', { loop: false, volume: 0.5 }),
+      cue(next, 'intro', { loop: false, volume: 0.2 }),
       'begin_question',
       { questionIndex },
     );
@@ -627,30 +633,25 @@ export function endAnsweringWithForces(state) {
     wrongIds,
   );
 
-  // Hold for host — loop eliminating.mp3 until they show who is out.
-  const elimLoops = Math.random() < 0.5 ? 1 : 3;
+  // Hold for host — silent until "Show wrong players"
   return actionMeta(
-    cue(
-      {
-        ...state,
-        phase: 'eliminating',
-        timerEndsAt: null,
-        players,
-        jackpot,
-        reveal,
-        pendingAfterReveal: pending,
-        elimination: {
-          stage: 'pending',
-          wrongIds,
-          revealedIds: [],
-          revealedCount: 0,
-          currentId: null,
-          pendingLoops: elimLoops,
-        },
+    {
+      ...state,
+      phase: 'eliminating',
+      timerEndsAt: null,
+      players,
+      jackpot,
+      reveal,
+      pendingAfterReveal: pending,
+      soundCue: null,
+      elimination: {
+        stage: 'pending',
+        wrongIds,
+        revealedIds: [],
+        revealedCount: 0,
+        currentId: null,
       },
-      'eliminating',
-      { loop: true, times: elimLoops, audience: 'all', volume: 0.55 },
-    ),
+    },
     'end_answering',
   );
 }
@@ -668,31 +669,34 @@ function computePendingAfterReveal(state, wrongIds) {
 }
 
 /**
- * Host pressed "Show who is right and wrong".
- * Stops the pending eliminating bed. Clean → left-count boards.
- * Wrongs → thump (TV + phones) + blue light one at a time; eliminate.mp3 only after all are shown.
+ * Host pressed "Show wrong players".
+ * TV eliminating.mp3 × 1–3 + all phones flash, then thump lights (or boards if clean).
  */
 export function showResults(state) {
   if (state.phase !== 'eliminating' || state.elimination?.stage !== 'pending') {
     throw new Error('Not waiting to show results');
   }
 
-  const wrongIds = state.elimination.wrongIds || [];
-  if (wrongIds.length === 0) {
-    return enterLeftCount({
-      ...state,
-      elimination: {
-        ...state.elimination,
-        stage: 'done',
-        currentId: null,
-        stingTargetId: null,
-        stingTimes: null,
-        stingSound: null,
+  const times = 1 + Math.floor(Math.random() * 3);
+  return actionMeta(
+    cue(
+      {
+        ...state,
+        elimination: {
+          ...state.elimination,
+          stage: 'scanning',
+          stingTimes: times,
+          stingSound: 'eliminating',
+          stingTargetId: null,
+          currentId: null,
+        },
       },
-    });
-  }
-
-  return startEliminationSting(state);
+      'eliminating',
+      { times, audience: 'display', loop: false },
+    ),
+    'show_results_scanning',
+    { times },
+  );
 }
 
 /** @deprecated use showResults */
@@ -700,23 +704,46 @@ export function showEliminated(state) {
   return showResults(state);
 }
 
-/** Clean-round TV sting finished → how many left. */
-export function finishCleanSting(state) {
-  if (state.phase !== 'eliminating' || state.elimination?.stage !== 'clean_sting') {
+/** After TV eliminating × 1–3 — start thumps, or go to boards if nobody wrong. */
+export function finishScanningSting(state) {
+  if (state.phase !== 'eliminating' || state.elimination?.stage !== 'scanning') {
     return state;
   }
-  return enterLeftCount({
-    ...state,
-    elimination: {
-      ...state.elimination,
-      stage: 'done',
-      currentId: null,
-      stingTimes: null,
-    },
-  });
+  const wrongIds = state.elimination.wrongIds || [];
+  if (wrongIds.length === 0) {
+    return enterEliminatedCount({
+      ...state,
+      elimination: {
+        ...state.elimination,
+        stage: 'done',
+        currentId: null,
+        stingTimes: null,
+        stingSound: null,
+      },
+    });
+  }
+  return startEliminationSting(state);
 }
 
-/** After outs — big "X left" board. */
+/** @deprecated use finishScanningSting */
+export function finishCleanSting(state) {
+  return finishScanningSting(state);
+}
+
+/** Big "X eliminated" board. */
+export function enterEliminatedCount(state) {
+  const out =
+    state.reveal?.eliminated ??
+    state.elimination?.wrongIds?.length ??
+    state.players.filter((p) => p.status === 'out').length;
+  return actionMeta(
+    cue({ ...state, phase: 'eliminated_count' }, 'eliminate', { audience: 'all' }),
+    'eliminated_count',
+    { out },
+  );
+}
+
+/** Big "X left / remain" board. */
 export function enterLeftCount(state) {
   const left = activePlayers(state).length;
   return actionMeta(
@@ -735,7 +762,7 @@ export function enterPrizePot(state) {
   return actionMeta(cue({ ...state, phase: 'prize_pot' }, 'jackpot'), 'prize_pot');
 }
 
-/** Correct-answer reveal after pot. */
+/** Correct-answer reveal after pot (optional / legacy). */
 export function enterAnswerReveal(state) {
   return actionMeta(cue({ ...state, phase: 'reveal' }, 'correct'), 'reveal_answer');
 }
@@ -837,7 +864,7 @@ export function revealNextEliminated(state) {
 
 export function finalizeElimination(state) {
   const elim = state.elimination;
-  const next = {
+  return enterEliminatedCount({
     ...state,
     elimination: {
       ...elim,
@@ -847,22 +874,19 @@ export function finalizeElimination(state) {
       stingTimes: null,
       stingSound: null,
     },
-  };
-  const left = activePlayers(next).length;
-  // eliminate.mp3 only after every wrong for this round has been shown
-  return actionMeta(
-    cue({ ...next, phase: 'left_count' }, 'eliminate', { audience: 'all' }),
-    'left_count',
-    { left },
-  );
+  });
 }
 
 export function advanceAfterReveal(state) {
+  // Host-driven boards: eliminated → remain → jackpot → next question
+  if (state.phase === 'eliminated_count') {
+    return enterLeftCount(state);
+  }
   if (state.phase === 'left_count') {
     return enterPrizePot(state);
   }
   if (state.phase === 'prize_pot') {
-    return enterAnswerReveal(state);
+    return continueAfterBoards(state);
   }
   if (state.phase !== 'reveal' && state.phase !== 'eliminating') {
     throw new Error('Not in reveal');
@@ -870,9 +894,12 @@ export function advanceAfterReveal(state) {
   // If somehow still eliminating, finish first
   if (state.phase === 'eliminating') {
     state = finalizeElimination(state);
-    // Still on left_count — don't skip the boards
-    if (state.phase === 'left_count') return state;
+    if (state.phase === 'eliminated_count') return state;
   }
+  return continueAfterBoards(state);
+}
+
+function continueAfterBoards(state) {
   const pending = state.pendingAfterReveal;
 
   if (pending === 'game_end') {
