@@ -710,15 +710,9 @@ function handlePlayerSoundCue(cue) {
     return;
   }
 
-  // thump — phones carry it loud (gain ~300%); TV soft at 20%
-  if (cue.name === 'thump') {
-    stopPendingEliminating();
-    const times = cue.times || 1;
-    playSoundTimes('thump', times, { volume: 1, gain: 3 }).catch(() => {});
-    return;
-  }
-
-  if (cue.audience === 'display') {
+  // thump is TV-only (mobile audio is unreliable mid-game)
+  if (cue.name === 'thump' || cue.audience === 'display') {
+    if (cue.name === 'thump') stopPendingEliminating();
     return;
   }
 

@@ -483,8 +483,8 @@ async function handleSoundCue(cue) {
   if (!cue || cue.at === lastSoundAt) return;
   lastSoundAt = cue.at;
 
-  // Legacy phone-only cues (if any) — TV stays silent; server timer advances
-  if (cue.audience === 'play' && cue.name !== 'thump') {
+  // Phone-only cues — TV stays silent; server timer advances
+  if (cue.audience === 'play') {
     return;
   }
 
@@ -507,11 +507,11 @@ async function handleSoundCue(cue) {
     return;
   }
 
-  // thump.mp3 — soft on TV (phones carry it); still advances the sting
+  // thump.mp3 on TV before each wrong blue light — advances the sting
   if (cue.name === 'thump') {
     stopPendingEliminating();
     const times = cue.times || state?.elimination?.stingTimes || 1;
-    await playSoundTimes('thump', times, { volume: 0.2 });
+    await playSoundTimes('thump', times, { volume: 0.85 });
     try {
       await sendAction('elim_sting_done');
     } catch {
