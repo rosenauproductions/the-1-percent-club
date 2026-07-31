@@ -2,6 +2,7 @@ import { connect, sendAction, setPlayerId } from '../shared/ws.js';
 import { installErrorHandlers, mountQaWidget, showBoot, hideBoot } from '../shared/boot.js';
 import {
   playSound,
+  playSoundTimes,
   playTestTone,
   noteSoundCue,
   isAudioActivated,
@@ -471,16 +472,21 @@ function render() {
       return;
     }
     const pending = elim.stage === 'pending';
+    const sting = elim.stage === 'sting';
     main.innerHTML = `
       <div class="hero">
-        <div class="status-pill">${pending ? 'TIME UP' : 'HOLDING'}</div>
+        <div class="status-pill">${
+          pending ? 'TIME UP' : sting ? 'SEARCHING' : 'HOLDING'
+        }</div>
         <h1 style="margin-top:1rem">${escapeHtml(p.name)}</h1>
         <p class="muted">${
           pending
             ? 'Watch the TV — host will show who is right and wrong'
-            : elim.wrongIds?.includes(p.id)
-              ? 'Waiting for the blue light…'
-              : 'You survived this round — hang tight'
+            : sting
+              ? 'Blue lights are scanning…'
+              : elim.wrongIds?.includes(p.id)
+                ? 'Waiting for the blue light…'
+                : 'You survived this round — hang tight'
         }</p>
       </div>
     `;
@@ -628,12 +634,13 @@ main.addEventListener('keydown', (e) => {
 
 function syncEliminationUi(p) {
   const elim = state?.elimination;
+  const searching = state?.phase === 'eliminating' && elim?.stage === 'sting' && p?.status === 'active';
   const amLit = !!(
     p &&
     (p.status === 'out' || elim?.revealedIds?.includes(p.id) || elim?.currentId === p.id)
   );
 
-  document.body.classList.remove('elim-searching');
+  document.body.classList.toggle('elim-searching', !!searching);
   document.body.classList.toggle('is-eliminated', !!(amLit && p?.status === 'out'));
 }
 
@@ -648,6 +655,13 @@ function handlePlayerSoundCue(cue) {
   if (!cue || cue.at === lastPlaySoundAt) return;
   lastPlaySoundAt = cue.at;
   noteSoundCue(cue);
+
+  if (cue.name === 'eliminating') {
+    const times = cue.times || state?.elimination?.stingTimes || 1;
+    // Full blast on phones — same clip as the audio test
+    playSoundTimes('eliminating', times, { volume: 1 }).catch(() => {});
+    return;
+  }
 
   if (cue.name === 'eliminate') {
     const elim = state?.elimination;

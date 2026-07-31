@@ -71,7 +71,8 @@ Placeholder tones live in `public/sounds/`. Drop your own files with the same na
 | `timer.mp3` | Host starts the question / answer window (plays through locks) |
 | `lock.mp3` | Unused (kept for optional custom wiring) |
 | `correct.mp3` | Clean round |
-| `eliminate.mp3` | Host taps Show who is right and wrong — each wrong player lit |
+| `eliminating.mp3` | Before each blue light (plays 1–3× randomly); also `/play` audio test |
+| `eliminate.mp3` | Each wrong player lit (after eliminating sting) |
 | `youre-out.mp3` | Personal out sting (eliminated phone) |
 | `pass.mp3` | Pass / cash-out moments |
 | `jackpot.mp3` | Jackpot sting |

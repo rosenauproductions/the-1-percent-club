@@ -20,8 +20,10 @@ import {
   usePass,
   endAnsweringWithForces,
   showResults,
-  revealNextEliminated,
+  finishEliminationSting,
+  continueElimination,
   advanceAfterReveal,
+  ELIM_STING_MS,
   hostOverride,
   cashoutDecide,
   resolveCashout,
@@ -82,15 +84,31 @@ function scheduleAnswerTimer() {
   }, delay + 50);
 }
 
-function scheduleNextElimLight(delay = ELIM_REVEAL_GAP_MS) {
+function scheduleElimStingFallback() {
+  if (elimRevealTimer) clearTimeout(elimRevealTimer);
+  const times = state.elimination?.stingTimes || 1;
+  const delay = times * ELIM_STING_MS + 400;
+  elimRevealTimer = setTimeout(() => {
+    try {
+      if (state.phase !== 'eliminating' || state.elimination?.stage !== 'sting') return;
+      state = finishEliminationSting(state);
+      broadcast();
+      scheduleAfterElimLight();
+    } catch {
+      // ignore
+    }
+  }, delay);
+}
+
+function scheduleAfterElimLight(delay = ELIM_REVEAL_GAP_MS) {
   if (elimRevealTimer) clearTimeout(elimRevealTimer);
   elimRevealTimer = setTimeout(() => {
     try {
       if (state.phase !== 'eliminating') return;
-      state = revealNextEliminated(state);
+      state = continueElimination(state);
       broadcast();
-      if (state.phase === 'eliminating') {
-        scheduleNextElimLight(ELIM_REVEAL_GAP_MS);
+      if (state.phase === 'eliminating' && state.elimination?.stage === 'sting') {
+        scheduleElimStingFallback();
       }
     } catch {
       // ignore
@@ -109,8 +127,13 @@ function scheduleSoundCueClear() {
   }
   const cue = state.soundCue;
   if (!cue?.at) return;
-  // Give phones time to receive eliminate / other cues before clearing.
-  const delay = cue.name === 'eliminate' ? 2500 : 1200;
+  // Give phones time to receive eliminate / eliminating cues before clearing.
+  const delay =
+    cue.name === 'eliminate'
+      ? 2500
+      : cue.name === 'eliminating'
+        ? Math.max(2500, (cue.times || 1) * ELIM_STING_MS + 800)
+        : 1200;
   soundCueClearTimer = setTimeout(() => {
     if (state.soundCue?.at === cue.at) {
       state = clearSoundCue(state);
@@ -258,8 +281,17 @@ async function handleAction(action, payload = {}, meta = {}) {
       requireHost(role);
       clearElimTimers();
       state = showResults(state);
-      if (state.phase === 'eliminating') {
-        scheduleNextElimLight(ELIM_REVEAL_GAP_MS);
+      if (state.phase === 'eliminating' && state.elimination?.stage === 'sting') {
+        scheduleElimStingFallback();
+      }
+      break;
+
+    case 'elim_sting_done':
+      // Display finished playing eliminating.mp3 × N — light that contestant
+      if (state.phase === 'eliminating' && state.elimination?.stage === 'sting') {
+        clearElimTimers();
+        state = finishEliminationSting(state);
+        scheduleAfterElimLight();
       }
       break;
 

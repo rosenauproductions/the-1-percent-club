@@ -55,7 +55,8 @@ function defaultSetup() {
   };
 }
 
-export const ELIMINATING_MS = 4400;
+/** Estimated length of one eliminating.mp3 play (server fallback timer). */
+export const ELIM_STING_MS = 900;
 export const ELIM_REVEAL_GAP_MS = 1200;
 
 export function createInitialState() {
@@ -87,8 +88,8 @@ export function createInitialState() {
   };
 }
 
-function cue(state, name) {
-  return { ...state, soundCue: { name, at: Date.now() } };
+function cue(state, name, extra = {}) {
+  return { ...state, soundCue: { name, at: Date.now(), ...extra } };
 }
 
 function actionMeta(state, type, extra = {}) {
@@ -635,7 +636,7 @@ function computePendingAfterReveal(state, wrongIds) {
 
 /**
  * Host pressed "Show who is right and wrong".
- * Clean round → reveal + correct sting. Otherwise start blue-light eliminations.
+ * Clean round → reveal + correct sting. Otherwise start eliminating.mp3 → blue light per wrong player.
  */
 export function showResults(state) {
   if (state.phase !== 'eliminating' || state.elimination?.stage !== 'pending') {
@@ -661,16 +662,7 @@ export function showResults(state) {
     );
   }
 
-  const ready = {
-    ...state,
-    elimination: {
-      ...state.elimination,
-      stage: 'lighting',
-      currentId: null,
-    },
-    soundCue: null,
-  };
-  return revealNextEliminated(ready);
+  return startEliminationSting(state);
 }
 
 /** @deprecated use showResults */
@@ -678,15 +670,47 @@ export function showEliminated(state) {
   return showResults(state);
 }
 
-/** Reveal the next wrong player (blue light + eliminate SFX). */
-export function revealNextEliminated(state) {
+/** Play eliminating.mp3 1–3 times, then blue-light the next wrong player. */
+export function startEliminationSting(state) {
   if (state.phase !== 'eliminating') throw new Error('Not eliminating');
   const elim = state.elimination;
-  if (!elim || elim.stage !== 'lighting') throw new Error('Not lighting eliminated yet');
+  if (!elim) throw new Error('No elimination data');
 
   const nextId = elim.wrongIds.find((id) => !elim.revealedIds.includes(id));
   if (!nextId) {
     return finalizeElimination(state);
+  }
+
+  const times = 1 + Math.floor(Math.random() * 3); // 1–3
+  return actionMeta(
+    cue(
+      {
+        ...state,
+        elimination: {
+          ...elim,
+          stage: 'sting',
+          stingTargetId: nextId,
+          stingTimes: times,
+          currentId: null,
+        },
+      },
+      'eliminating',
+      { times },
+    ),
+    'elim_sting',
+    { playerId: nextId, times },
+  );
+}
+
+/** Sting finished — light the targeted wrong player (eliminate.mp3). */
+export function finishEliminationSting(state) {
+  if (state.phase !== 'eliminating' || state.elimination?.stage !== 'sting') {
+    return state;
+  }
+  const elim = state.elimination;
+  const nextId = elim.stingTargetId;
+  if (!nextId || elim.revealedIds.includes(nextId)) {
+    return continueElimination(state);
   }
 
   const revealedIds = [...elim.revealedIds, nextId];
@@ -694,22 +718,48 @@ export function revealNextEliminated(state) {
     p.id === nextId ? { ...p, status: 'out' } : p,
   );
 
-  let next = {
-    ...state,
-    players,
-    elimination: {
-      ...elim,
-      stage: 'lighting',
-      revealedIds,
-      revealedCount: revealedIds.length,
-      currentId: nextId,
-    },
-  };
-  next = cue(next, 'eliminate');
-  return actionMeta(next, 'elim_light', { playerId: nextId });
+  return actionMeta(
+    cue(
+      {
+        ...state,
+        players,
+        elimination: {
+          ...elim,
+          stage: 'lighting',
+          revealedIds,
+          revealedCount: revealedIds.length,
+          currentId: nextId,
+          stingTargetId: null,
+          stingTimes: null,
+        },
+      },
+      'eliminate',
+    ),
+    'elim_light',
+    { playerId: nextId },
+  );
 }
 
-function finalizeElimination(state) {
+/** After a blue light beat — sting the next wrong player, or go to reveal. */
+export function continueElimination(state) {
+  if (state.phase !== 'eliminating') return state;
+  const elim = state.elimination;
+  if (!elim) return finalizeElimination(state);
+  const nextId = elim.wrongIds.find((id) => !elim.revealedIds.includes(id));
+  if (!nextId) return finalizeElimination(state);
+  return startEliminationSting(state);
+}
+
+/** @deprecated — prefer finishEliminationSting / continueElimination */
+export function revealNextEliminated(state) {
+  if (state.phase !== 'eliminating') throw new Error('Not eliminating');
+  if (state.elimination?.stage === 'sting') {
+    return finishEliminationSting(state);
+  }
+  return continueElimination(state);
+}
+
+export function finalizeElimination(state) {
   const elim = state.elimination;
   let next = {
     ...state,
@@ -718,6 +768,8 @@ function finalizeElimination(state) {
       ...elim,
       stage: 'done',
       currentId: null,
+      stingTargetId: null,
+      stingTimes: null,
     },
     soundCue: null,
   };

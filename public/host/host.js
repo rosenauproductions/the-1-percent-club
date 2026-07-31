@@ -125,11 +125,20 @@ function renderQuestion() {
       }</h2>
       ${
         !answering
-          ? `<p class="muted" style="margin-bottom:0.5rem">${
-              isOnePercent
-                ? `${active.length} finalist${active.length === 1 ? '' : 's'} · TV is waiting — talk, then start`
-                : 'Only you can see this. Talk to the room, then start when ready.'
-            }</p>`
+          ? `<div class="host-script" style="margin-bottom:0.75rem">
+              <p class="muted" style="margin:0 0 0.4rem">
+                ${
+                  isOnePercent
+                    ? `${active.length} finalist${active.length === 1 ? '' : 's'} · TV is waiting.`
+                    : 'Only you can see this. TV is waiting.'
+                }
+              </p>
+              <p style="margin:0;font-weight:700;line-height:1.4">
+                Ask this question out loud, then say:
+                <span style="color:var(--club-gold,#ffd54a)">"Your time starts now."</span>
+              </p>
+              <p class="muted" style="margin:0.4rem 0 0">Tap Start right as you say it.</p>
+            </div>`
           : ''
       }
       <p style="font-weight:700;line-height:1.35">${escapeHtml(q?.prompt || '')}</p>
@@ -138,9 +147,7 @@ function renderQuestion() {
       <div class="stack" style="margin-top:0.85rem">
         ${
           !answering
-            ? `<button class="btn-primary big-btn" data-act="start_answering">${
-                isOnePercent ? 'Show 1% question & start timer' : 'Show question & start timer'
-              }</button>`
+            ? `<button class="btn-primary big-btn" data-act="start_answering">Start — "Your time starts now"</button>`
             : `<button class="btn-gold big-btn" data-act="end_answering">End round now</button>`
         }
       </div>
@@ -321,10 +328,15 @@ function render() {
             <button class="btn-primary big-btn" style="margin-top:0.85rem" data-act="show_results">Show who is right and wrong</button>
           </div>`;
       } else {
+        const sting = state.elimination?.stage === 'sting';
         main.innerHTML = `
           <div class="card">
             <h2>Elimination</h2>
-            <p class="muted">Lighting out ${state.elimination?.revealedCount || 0} / ${state.elimination?.wrongIds?.length || 0}</p>
+            <p class="muted">${
+              sting
+                ? `Scanning… (${state.elimination?.stingTimes || 1}× eliminating.mp3)`
+                : `Lighting out ${state.elimination?.revealedCount || 0} / ${state.elimination?.wrongIds?.length || 0}`
+            }</p>
             <p class="muted">Wait for the sequence to finish, then continue.</p>
           </div>`;
       }

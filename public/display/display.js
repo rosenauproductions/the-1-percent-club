@@ -2,6 +2,7 @@ import { connect, sendAction } from '../shared/ws.js';
 import {
   activateAudio,
   playSound,
+  playSoundTimes,
   setMasterVolume,
   configureSounds,
   isAudioActivated,
@@ -32,7 +33,12 @@ function seatClass(p) {
   if (p.status === 'cashed' || p.status === 'took10k') return p.status;
   const elim = state?.elimination;
   if (p.status === 'out' || elim?.revealedIds?.includes(p.id)) return 'out';
-  if (elim?.stage === 'lighting' && elim.wrongIds?.includes(p.id) && !elim.revealedIds?.includes(p.id)) {
+  if (
+    (elim?.stage === 'sting' || elim?.stage === 'lighting') &&
+    p.status === 'active' &&
+    elim.wrongIds?.includes(p.id) &&
+    !elim.revealedIds?.includes(p.id)
+  ) {
     return 'searching';
   }
   if (p.usedPass) return 'pass';
@@ -248,6 +254,7 @@ function syncQuestionImageLayout() {
 function renderEliminating() {
   const elim = state.elimination || {};
   const pending = elim.stage === 'pending';
+  const sting = elim.stage === 'sting';
   const count = elim.revealedCount || 0;
   const total = elim.wrongIds?.length || 0;
   const current = state.players.find((p) => p.id === elim.currentId);
@@ -257,7 +264,11 @@ function renderEliminating() {
       <div class="elim-panel">
         <div class="pct-badge">${state.currentQuestion?.percent ?? '?'}%</div>
         <h2 class="elim-title">${
-          pending ? 'THE <span class="pct">1%</span> CLUB' : "YOU'RE OUT"
+          pending
+            ? 'THE <span class="pct">1%</span> CLUB'
+            : sting
+              ? 'SEARCHING…'
+              : "YOU'RE OUT"
         }</h2>
         ${
           pending
@@ -269,9 +280,11 @@ function renderEliminating() {
         </div>`
         }
         ${
-          current && !pending
+          current && !pending && !sting
             ? `<p class="elim-current">${escapeHtml(current.name)}</p>`
-            : `<p class="elim-current muted">${pending ? '' : ' '}</p>`
+            : `<p class="elim-current muted">${
+                sting ? 'Blue lights scanning…' : pending ? '' : ' '
+              }</p>`
         }
       </div>
       <div class="side-grid">${renderSeatGrid(state.players)}</div>
@@ -418,11 +431,25 @@ async function handleSoundCue(cue) {
     looping ||
     cue.name === 'intro' ||
     cue.name === 'timer' ||
+    cue.name === 'eliminating' ||
     cue.name === 'eliminate' ||
     cue.name === 'correct' ||
     cue.name === 'win' ||
     cue.name === 'jackpot';
   if (replacesMusic) stopAllMusic();
+
+  // eliminating.mp3 × 1–3, then tell server to blue-light that contestant
+  if (cue.name === 'eliminating') {
+    const times = cue.times || state?.elimination?.stingTimes || 1;
+    await playSoundTimes('eliminating', times, { volume: 0.5 });
+    try {
+      await sendAction('elim_sting_done');
+    } catch {
+      // server fallback timer will light them
+    }
+    return;
+  }
+
   // Intro + blue-light quieter on the room TV; phones play elim at full blast.
   const volume =
     cue.name === 'intro' || cue.name === 'eliminate' ? 0.5 : undefined;

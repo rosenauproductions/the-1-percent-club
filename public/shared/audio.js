@@ -4,6 +4,7 @@ const DEFAULT_SOUNDS = {
   timer: 'timer.mp3',
   lock: 'lock.mp3',
   correct: 'correct.mp3',
+  eliminating: 'eliminating.mp3',
   eliminate: 'eliminate.mp3',
   youre_out: 'youre-out.mp3',
   pass: 'pass.mp3',
@@ -224,10 +225,31 @@ export async function replayPendingSfx() {
   return playSound(name, { loop, volume });
 }
 
-/** Audible confirmation for volume-gate / QA test (full-blast eliminate). */
+/** Wait until a one-shot sound finishes (for chained eliminating.mp3 plays). */
+export async function playSoundUntilEnded(name, options = {}) {
+  const audio = await playSound(name, { ...options, loop: false, asMusic: false });
+  if (!audio) return null;
+  await new Promise((resolve) => {
+    const done = () => resolve();
+    audio.addEventListener('ended', done, { once: true });
+    audio.addEventListener('error', done, { once: true });
+    setTimeout(done, 8000);
+  });
+  return audio;
+}
+
+/** Play a sound N times back-to-back. */
+export async function playSoundTimes(name, times, options = {}) {
+  const n = Math.max(1, Math.min(8, Number(times) || 1));
+  for (let i = 0; i < n; i++) {
+    await playSoundUntilEnded(name, options);
+  }
+}
+
+/** Audible confirmation for volume-gate / QA test (eliminating.mp3). */
 export async function playTestTone() {
   await activateAudio();
   if (!audioActivated) return false;
-  await playSound('eliminate', { volume: 1 });
+  await playSoundUntilEnded('eliminating', { volume: 1 });
   return true;
 }

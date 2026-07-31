@@ -207,7 +207,7 @@ body.is-eliminated .play-header {
   border-bottom-color: rgba(70, 120, 210, 0.35);
 }
 
-/* Optional search-style fade (unused; elim waits for host Show eliminated) */
+/* Sting phase — active phones pulse while eliminating.mp3 plays */
 body.elim-searching {
   animation: elim-fade-green-blue 4.4s ease-in-out forwards;
 }
