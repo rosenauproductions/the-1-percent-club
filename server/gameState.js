@@ -317,7 +317,8 @@ export function startGame(state, questions, packName = null) {
     })),
   };
 
-  next = cue(next, 'intro');
+  // Soft loop so the host can talk over the show open before questions.
+  next = cue(next, 'intro', { loop: true, volume: 0.5 });
   next = actionMeta(next, 'start_game');
   next.phase = state.setup.skipIntro ? 'question' : 'intro';
 
@@ -386,9 +387,13 @@ export function beginQuestion(state, questionIndex) {
     _awaitingQuestionIndex: undefined,
   };
 
-  // Intro bed only while waiting to start the first question; later holds are silent.
+  // After intro talk, first-question hold keeps a soft one-shot bed; later holds are silent.
   if (questionIndex === 0) {
-    return actionMeta(cue(next, 'intro'), 'begin_question', { questionIndex });
+    return actionMeta(
+      cue(next, 'intro', { loop: false, volume: 0.5 }),
+      'begin_question',
+      { questionIndex },
+    );
   }
   return actionMeta({ ...next, soundCue: null }, 'begin_question', { questionIndex });
 }

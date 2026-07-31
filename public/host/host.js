@@ -105,7 +105,10 @@ function renderIntro() {
     <div class="card">
       <h2>Intro</h2>
       <p class="muted">${state.players.length} players ready</p>
-      <button class="btn-primary big-btn" data-act="skip_intro">Begin questions</button>
+      <p style="margin:0.65rem 0 0;font-weight:700;line-height:1.4">
+        Intro music is at <span style="color:var(--club-gold,#ffd54a)">50%</span> — talk about the game, then begin.
+      </p>
+      <button class="btn-primary big-btn" style="margin-top:0.85rem" data-act="skip_intro">Begin questions</button>
     </div>
     <button class="btn-danger" data-act="reset_lobby">Reset to lobby</button>
   `;

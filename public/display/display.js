@@ -483,7 +483,7 @@ async function handleSoundCue(cue) {
   }
 
   // Only bed / phase music stops the previous track.
-  const looping = cue.name === 'interlude';
+  const looping = cue.name === 'interlude' || cue.loop === true;
   const replacesMusic =
     looping ||
     cue.name === 'intro' ||
@@ -513,13 +513,18 @@ async function handleSoundCue(cue) {
   }
 
   const volume =
-    cue.name === 'intro' || cue.name === 'eliminate' ? 0.5 : undefined;
+    typeof cue.volume === 'number'
+      ? cue.volume
+      : cue.name === 'intro' || cue.name === 'eliminate'
+        ? 0.5
+        : undefined;
   await playSound(cue.name, {
     loop: looping,
     asMusic: looping || cue.name === 'intro',
     ...(volume != null ? { volume } : {}),
   });
-  if (cue.name !== 'eliminate') {
+  // Don't clear looping intro — host is talking over it until Begin questions
+  if (cue.name !== 'eliminate' && !looping) {
     try {
       await sendAction('clear_sound');
     } catch {

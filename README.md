@@ -66,7 +66,7 @@ Placeholder tones live in `public/sounds/`. Drop your own files with the same na
 
 | File | Cue |
 |------|-----|
-| `intro.mp3` | Game start + wait before **first** question only (once, 50% on TV) |
+| `intro.mp3` | Game open loops at **50%** so host can talk; soft one-shot before first question |
 | `interlude.mp3` | Unused bed (kept for optional custom wiring) |
 | `timer.mp3` | Host starts the question / answer window (plays through locks) |
 | `lock.mp3` | Unused (kept for optional custom wiring) |
