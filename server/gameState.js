@@ -57,7 +57,7 @@ function defaultSetup() {
 
 /** Estimated length of one eliminating.mp3 play (server fallback timer). */
 export const ELIM_STING_MS = 900;
-/** Estimated length of thump.mp3 (TV sting before each blue light). */
+/** Estimated length of thump.mp3 (TV + phones before each blue light). */
 export const THUMP_MS = 1200;
 /** Default / legacy gap after a blue light (prefer thumpGapMs). */
 export const ELIM_REVEAL_GAP_MS = 1000;
@@ -670,7 +670,7 @@ function computePendingAfterReveal(state, wrongIds) {
 /**
  * Host pressed "Show who is right and wrong".
  * Stops the pending eliminating bed. Clean → left-count boards.
- * Wrongs → TV thump + blue light one at a time; eliminate.mp3 only after all are shown.
+ * Wrongs → thump (TV + phones) + blue light one at a time; eliminate.mp3 only after all are shown.
  */
 export function showResults(state) {
   if (state.phase !== 'eliminating' || state.elimination?.stage !== 'pending') {
@@ -741,7 +741,7 @@ export function enterAnswerReveal(state) {
 }
 
 /**
- * Sting before the next blue light — thump on TV for every wrong.
+ * Sting before the next blue light — thump on TV + phones for every wrong.
  */
 export function startEliminationSting(state) {
   if (state.phase !== 'eliminating') throw new Error('Not eliminating');
@@ -756,7 +756,7 @@ export function startEliminationSting(state) {
 
   const times = 1;
   const soundName = 'thump';
-  const audience = 'display';
+  const audience = 'all';
 
   return actionMeta(
     cue(

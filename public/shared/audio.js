@@ -280,7 +280,7 @@ export async function playSoundTimes(name, times, options = {}) {
 export async function playTestTone() {
   await activateAudio();
   if (!audioActivated) return false;
-  await playSoundUntilEnded('thump', { volume: 1, gain: 3 });
+  await playSoundUntilEnded('thump', { volume: 1 });
   await playSoundUntilEnded('eliminating', { volume: 1 });
   return true;
 }

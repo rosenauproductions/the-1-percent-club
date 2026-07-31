@@ -354,7 +354,7 @@ function render() {
             <h2>Elimination</h2>
             <p class="muted">${
               sting
-                ? `Scanning… thump on TV`
+                ? `Scanning… thump (TV + phones)`
                 : `Lighting out ${state.elimination?.revealedCount || 0} / ${state.elimination?.wrongIds?.length || 0}`
             }</p>
             <p class="muted">Wait for the sequence to finish, then continue.</p>

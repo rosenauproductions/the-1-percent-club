@@ -710,9 +710,15 @@ function handlePlayerSoundCue(cue) {
     return;
   }
 
-  // thump is TV-only (mobile audio is unreliable mid-game)
-  if (cue.name === 'thump' || cue.audience === 'display') {
-    if (cue.name === 'thump') stopPendingEliminating();
+  // thump on phones (louder mp3); TV also plays
+  if (cue.name === 'thump') {
+    stopPendingEliminating();
+    const times = cue.times || 1;
+    playSoundTimes('thump', times, { volume: 1 }).catch(() => {});
+    return;
+  }
+
+  if (cue.audience === 'display') {
     return;
   }
 
