@@ -32,7 +32,6 @@ function seatClass(p) {
   if (p.status === 'cashed' || p.status === 'took10k') return p.status;
   const elim = state?.elimination;
   if (p.status === 'out' || elim?.revealedIds?.includes(p.id)) return 'out';
-  if (elim?.stage === 'search' && p.status === 'active') return 'searching';
   if (elim?.stage === 'lighting' && elim.wrongIds?.includes(p.id) && !elim.revealedIds?.includes(p.id)) {
     return 'searching';
   }
@@ -166,35 +165,15 @@ function renderQuestion() {
   const locked = Object.values(state.answers || {}).filter((a) => a.locked).length;
   const answering = state.phase === 'answering';
   const promptHidden = !answering && (!!q?.promptHidden || !q?.prompt);
-  const isOnePercent = q?.percent === 1 || state.questionIndex === 14;
   const hasImage = !!q?.image && !promptHidden;
   const hasChoices = !promptHidden && Array.isArray(q?.choices) && q.choices.length > 0;
 
-  // Host talk beat — seats + percent only; question waits for Start.
+  // Host talk beat — brand mark only until Start reveals the question.
   if (promptHidden) {
-    const names = active.map((p) => escapeHtml(p.name)).join(' · ');
     main.innerHTML = `
       <div class="question-layout">
         <div class="question-panel host-hold">
-          <div class="pct-badge">${q?.percent ?? '?'}%${
-            isOnePercent
-              ? '<small>THE FINAL QUESTION</small>'
-              : '<small>NEXT QUESTION</small>'
-          }</div>
-          <div class="host-hold__body">
-            <h2 class="host-hold__title">${
-              isOnePercent
-                ? 'WELCOME, <span class="pct">FINALISTS</span>'
-                : 'OVER TO THE <span class="pct">HOST</span>'
-            }</h2>
-            <p class="host-hold__copy">${
-              isOnePercent
-                ? `${active.length} contestant${active.length === 1 ? '' : 's'} left for the 1% question.`
-                : "Talk through the last answer, check who's still in, then start when ready."
-            }</p>
-            ${names ? `<p class="host-hold__names">${names}</p>` : ''}
-            <div class="lock-progress">Waiting for host to start…</div>
-          </div>
+          <h1 class="host-hold__brand">THE <span class="pct">1%</span> CLUB</h1>
         </div>
         <div class="side-grid">${renderSeatGrid(state.players)}</div>
       </div>
@@ -268,7 +247,7 @@ function syncQuestionImageLayout() {
 
 function renderEliminating() {
   const elim = state.elimination || {};
-  const searching = elim.stage === 'search';
+  const pending = elim.stage === 'pending';
   const count = elim.revealedCount || 0;
   const total = elim.wrongIds?.length || 0;
   const current = state.players.find((p) => p.id === elim.currentId);
@@ -277,16 +256,22 @@ function renderEliminating() {
     <div class="elim-layout">
       <div class="elim-panel">
         <div class="pct-badge">${state.currentQuestion?.percent ?? '?'}%</div>
-        <h2 class="elim-title">${searching ? 'SEARCHING…' : 'YOU’RE OUT'}</h2>
-        <div class="elim-count">
+        <h2 class="elim-title">${
+          pending ? 'THE <span class="pct">1%</span> CLUB' : "YOU'RE OUT"
+        }</h2>
+        ${
+          pending
+            ? ''
+            : `<div class="elim-count">
           <span class="elim-count__label">WRONG</span>
           <span class="elim-count__value" id="elimWrongCount">${count}</span>
           <span class="elim-count__of">/ ${total}</span>
-        </div>
+        </div>`
+        }
         ${
-          current && !searching
+          current && !pending
             ? `<p class="elim-current">${escapeHtml(current.name)}</p>`
-            : `<p class="elim-current muted">${searching ? 'Blue lights scanning the room' : ' '}</p>`
+            : `<p class="elim-current muted">${pending ? '' : ' '}</p>`
         }
       </div>
       <div class="side-grid">${renderSeatGrid(state.players)}</div>
@@ -426,18 +411,26 @@ function render() {
 async function handleSoundCue(cue) {
   if (!cue || cue.at === lastSoundAt) return;
   lastSoundAt = cue.at;
-  const looping = cue.name === 'intro' || cue.name === 'interlude';
-  if (!looping) stopAllMusic();
-  const audio = await playSound(cue.name, { loop: looping });
-  if (cue.name === 'eliminating' && audio) {
-    audio.addEventListener(
-      'ended',
-      () => {
-        sendAction('elim_search_done').catch(() => {});
-      },
-      { once: true },
-    );
-  }
+  // Only bed / phase music stops the previous track. Short SFX (pass, eliminate, …)
+  // must not cut the question timer bed mid-round.
+  const looping = cue.name === 'interlude';
+  const replacesMusic =
+    looping ||
+    cue.name === 'intro' ||
+    cue.name === 'timer' ||
+    cue.name === 'eliminate' ||
+    cue.name === 'correct' ||
+    cue.name === 'win' ||
+    cue.name === 'jackpot';
+  if (replacesMusic) stopAllMusic();
+  // Intro + blue-light quieter on the room TV; phones play elim at full blast.
+  const volume =
+    cue.name === 'intro' || cue.name === 'eliminate' ? 0.5 : undefined;
+  await playSound(cue.name, {
+    loop: looping,
+    asMusic: looping || cue.name === 'intro',
+    ...(volume != null ? { volume } : {}),
+  });
   try {
     await sendAction('clear_sound');
   } catch {
@@ -446,10 +439,18 @@ async function handleSoundCue(cue) {
 }
 
 function onState(next) {
+  const prevPhase = state?.phase;
   state = next;
   hideBoot();
   setMasterVolume(next.setup?.masterVolume ?? 0.7);
   configureSounds(next.setup?.sounds);
+  // Stop question bed when the round ends (host still holds before Show eliminated)
+  if (
+    prevPhase === 'answering' &&
+    (next.phase === 'eliminating' || next.phase === 'reveal')
+  ) {
+    stopAllMusic();
+  }
   render();
   if (next.phase === 'answering') startTimerTick();
   handleSoundCue(next.soundCue);

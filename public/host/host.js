@@ -141,7 +141,7 @@ function renderQuestion() {
             ? `<button class="btn-primary big-btn" data-act="start_answering">${
                 isOnePercent ? 'Show 1% question & start timer' : 'Show question & start timer'
               }</button>`
-            : `<button class="btn-gold big-btn" data-act="end_answering">Force reveal now</button>`
+            : `<button class="btn-gold big-btn" data-act="end_answering">End round now</button>`
         }
       </div>
     </div>
@@ -302,16 +302,32 @@ function render() {
       renderReveal();
       break;
     case 'eliminating':
-      main.innerHTML = `
-        <div class="card">
-          <h2>Elimination</h2>
-          <p class="muted">${
-            state.elimination?.stage === 'search'
-              ? 'Blue light search in progress…'
-              : `Lighting out ${state.elimination?.revealedCount || 0} / ${state.elimination?.wrongIds?.length || 0}`
-          }</p>
-          <p class="muted">Wait for the sequence to finish, then continue.</p>
-        </div>`;
+      if (state.elimination?.stage === 'pending') {
+        const r = state.reveal;
+        main.innerHTML = `
+          <div class="card">
+            <h2>Round over</h2>
+            <p class="muted">TV is holding — you see results first.</p>
+            <ul class="answer-list" style="margin-top:0.75rem">
+              ${(r?.results || [])
+                .map(
+                  (row) => `<li>
+                    <div class="name ${row.correct ? 'ok' : 'bad'}">${escapeHtml(row.name)} ${row.correct ? '✓' : '✗'}</div>
+                    <div class="text">${escapeHtml(row.text)}</div>
+                  </li>`,
+                )
+                .join('')}
+            </ul>
+            <button class="btn-primary big-btn" style="margin-top:0.85rem" data-act="show_results">Show who is right and wrong</button>
+          </div>`;
+      } else {
+        main.innerHTML = `
+          <div class="card">
+            <h2>Elimination</h2>
+            <p class="muted">Lighting out ${state.elimination?.revealedCount || 0} / ${state.elimination?.wrongIds?.length || 0}</p>
+            <p class="muted">Wait for the sequence to finish, then continue.</p>
+          </div>`;
+      }
       break;
     case 'cashout_offer':
       renderCashout();

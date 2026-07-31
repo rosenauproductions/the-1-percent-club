@@ -16,6 +16,7 @@ window.addEventListener(
 );
 
 const STORAGE_KEY = 'club_player_v1';
+const VOLUME_KEY = 'club_volume_ok_v1';
 const main = document.getElementById('main');
 const meta = document.getElementById('meta');
 
@@ -27,6 +28,7 @@ let tick = null;
 let prevStatus = null;
 let playedOutSound = false;
 let lastPlaySoundAt = null;
+let volumeReady = sessionStorage.getItem(VOLUME_KEY) === '1';
 
 const params = new URLSearchParams(location.search);
 const presetCode = (params.get('code') || '').toUpperCase();
@@ -85,11 +87,32 @@ async function act(action, payload = {}) {
   }
 }
 
+function renderVolumeGate() {
+  meta.textContent = 'Volume check';
+  main.innerHTML = `
+    <div class="hero">
+      <h1>THE <span class="pct">1%</span> CLUB</h1>
+      <p class="volume-gate__copy">
+        Make sure your phone or device volume is at <strong>100%</strong> before playing.
+      </p>
+    </div>
+    <div class="card">
+      <div class="stack">
+        <button class="btn-primary big-btn" id="volumeOkBtn" type="button">
+          Volume is at 100% — continue
+        </button>
+        <p class="muted volume-gate__hint">Blue-light sounds play on your phone when you are out.</p>
+      </div>
+    </div>
+  `;
+}
+
 function renderJoin() {
   main.innerHTML = `
     <div class="hero">
       <h1>THE 1% CLUB</h1>
       <p>Enter your name to take a seat</p>
+      <p class="muted volume-gate__reminder">Keep device volume at 100%</p>
     </div>
     <div class="card">
       <div class="stack">
@@ -357,6 +380,11 @@ function renderWatch() {
 }
 
 function render() {
+  if (!volumeReady) {
+    renderVolumeGate();
+    return;
+  }
+
   const p = me();
   if (!p || (p.status !== 'out' && state?.phase !== 'eliminating')) {
     document.body.classList.remove('is-eliminated', 'elim-searching');
@@ -377,20 +405,21 @@ function render() {
     return;
   }
 
-  // Elimination suspense / lighting — stay on a holding screen until lit or safe
+  // Hold / lighting — stay until lit or safe; host starts Show eliminated
   if (state.phase === 'eliminating') {
     const elim = state.elimination || {};
     if (p.status === 'out' || elim.revealedIds?.includes(p.id)) {
       renderOut();
       return;
     }
+    const pending = elim.stage === 'pending';
     main.innerHTML = `
       <div class="hero">
-        <div class="status-pill">${elim.stage === 'search' ? 'SEARCHING' : 'HOLDING'}</div>
+        <div class="status-pill">${pending ? 'TIME UP' : 'HOLDING'}</div>
         <h1 style="margin-top:1rem">${escapeHtml(p.name)}</h1>
         <p class="muted">${
-          elim.stage === 'search'
-            ? 'Blue lights are scanning…'
+          pending
+            ? 'Watch the TV — host will show who is right and wrong'
             : elim.wrongIds?.includes(p.id)
               ? 'Waiting for the blue light…'
               : 'You survived this round — hang tight'
@@ -446,6 +475,13 @@ main.addEventListener('click', async (e) => {
   if (!(t instanceof HTMLElement)) return;
 
   try {
+    if (t.id === 'volumeOkBtn') {
+      activateAudio();
+      volumeReady = true;
+      sessionStorage.setItem(VOLUME_KEY, '1');
+      render();
+      return;
+    }
     if (t.id === 'joinBtn') {
       const name = document.getElementById('nameInput')?.value?.trim() || '';
       playerName = name;
@@ -516,13 +552,12 @@ main.addEventListener('keydown', (e) => {
 
 function syncEliminationUi(p) {
   const elim = state?.elimination;
-  const searching = state?.phase === 'eliminating' && elim?.stage === 'search';
   const amLit = !!(
     p &&
     (p.status === 'out' || elim?.revealedIds?.includes(p.id) || elim?.currentId === p.id)
   );
 
-  document.body.classList.toggle('elim-searching', !!(searching && p?.status === 'active'));
+  document.body.classList.remove('elim-searching');
   document.body.classList.toggle('is-eliminated', !!(amLit && p?.status === 'out'));
 }
 
@@ -530,17 +565,12 @@ function handlePlayerSoundCue(cue) {
   if (!cue || cue.at === lastPlaySoundAt) return;
   lastPlaySoundAt = cue.at;
 
-  if (cue.name === 'eliminating') {
-    activateAudio();
-    playSound('eliminating', { volume: 0.8 }).catch(() => {});
-    return;
-  }
   if (cue.name === 'eliminate') {
     const elim = state?.elimination;
     if (elim?.currentId && elim.currentId === playerId) {
       activateAudio();
-      playSound('eliminate', { volume: 0.9 }).catch(() => {});
-      playSound('youre_out', { volume: 0.85 }).catch(() => {});
+      playSound('eliminate', { volume: 1 }).catch(() => {});
+      playSound('youre_out', { volume: 1 }).catch(() => {});
       playedOutSound = true;
     }
   }
@@ -556,8 +586,8 @@ function maybePlayOutSound(p) {
   if (p.status === 'out' && prevStatus !== 'out' && !playedOutSound) {
     playedOutSound = true;
     activateAudio();
-    playSound('eliminate', { volume: 0.9 }).catch(() => {});
-    playSound('youre_out', { volume: 0.85 }).catch(() => {});
+    playSound('eliminate', { volume: 1 }).catch(() => {});
+    playSound('youre_out', { volume: 1 }).catch(() => {});
   }
   prevStatus = p.status;
 }

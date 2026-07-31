@@ -412,22 +412,20 @@ export function submitAnswer(state, playerId, text) {
   const trimmed = String(text ?? '').trim().slice(0, 80);
   if (!trimmed) throw new Error('Answer required');
 
+  // No lock SFX — question/timer bed keeps playing until the round ends.
   return actionMeta(
-    cue(
-      {
-        ...state,
-        answers: {
-          ...state.answers,
-          [playerId]: {
-            text: trimmed,
-            locked: true,
-            usedPass: false,
-            lockedAt: Date.now(),
-          },
+    {
+      ...state,
+      answers: {
+        ...state.answers,
+        [playerId]: {
+          text: trimmed,
+          locked: true,
+          usedPass: false,
+          lockedAt: Date.now(),
         },
       },
-      'lock',
-    ),
+    },
     'submit_answer',
     { playerId },
   );
@@ -600,49 +598,25 @@ export function endAnsweringWithForces(state) {
     wrongIds,
   );
 
-  // Clean round — skip elimination drama
-  if (wrongIds.length === 0) {
-    return actionMeta(
-      cue(
-        {
-          ...state,
-          phase: 'reveal',
-          timerEndsAt: null,
-          players,
-          jackpot,
-          reveal,
-          elimination: null,
-          pendingAfterReveal: pending,
-        },
-        'correct',
-      ),
-      'end_answering',
-    );
-  }
-
-  const now = Date.now();
+  // Always hold for host — "Show who is right and wrong" starts lighting / reveal.
   return actionMeta(
-    cue(
-      {
-        ...state,
-        phase: 'eliminating',
-        timerEndsAt: null,
-        players,
-        jackpot,
-        reveal,
-        pendingAfterReveal: pending,
-        elimination: {
-          stage: 'search',
-          wrongIds,
-          revealedIds: [],
-          revealedCount: 0,
-          currentId: null,
-          searchStartedAt: now,
-          searchEndsAt: now + ELIMINATING_MS,
-        },
+    {
+      ...state,
+      phase: 'eliminating',
+      timerEndsAt: null,
+      players,
+      jackpot,
+      reveal,
+      pendingAfterReveal: pending,
+      soundCue: null,
+      elimination: {
+        stage: 'pending',
+        wrongIds,
+        revealedIds: [],
+        revealedCount: 0,
+        currentId: null,
       },
-      'eliminating',
-    ),
+    },
     'end_answering',
   );
 }
@@ -659,30 +633,56 @@ function computePendingAfterReveal(state, wrongIds) {
   return 'next_question';
 }
 
-/** Search sting finished — start lighting wrong players one by one. */
-export function finishEliminationSearch(state) {
-  if (state.phase !== 'eliminating' || state.elimination?.stage !== 'search') {
-    return state;
+/**
+ * Host pressed "Show who is right and wrong".
+ * Clean round → reveal + correct sting. Otherwise start blue-light eliminations.
+ */
+export function showResults(state) {
+  if (state.phase !== 'eliminating' || state.elimination?.stage !== 'pending') {
+    throw new Error('Not waiting to show results');
   }
-  return actionMeta(
-    {
-      ...state,
-      elimination: {
-        ...state.elimination,
-        stage: 'lighting',
-        currentId: null,
-      },
-      soundCue: null,
+
+  const wrongIds = state.elimination.wrongIds || [];
+  if (wrongIds.length === 0) {
+    return actionMeta(
+      cue(
+        {
+          ...state,
+          phase: 'reveal',
+          elimination: {
+            ...state.elimination,
+            stage: 'done',
+            currentId: null,
+          },
+        },
+        'correct',
+      ),
+      'show_results',
+    );
+  }
+
+  const ready = {
+    ...state,
+    elimination: {
+      ...state.elimination,
+      stage: 'lighting',
+      currentId: null,
     },
-    'elim_search_done',
-  );
+    soundCue: null,
+  };
+  return revealNextEliminated(ready);
+}
+
+/** @deprecated use showResults */
+export function showEliminated(state) {
+  return showResults(state);
 }
 
 /** Reveal the next wrong player (blue light + eliminate SFX). */
 export function revealNextEliminated(state) {
   if (state.phase !== 'eliminating') throw new Error('Not eliminating');
   const elim = state.elimination;
-  if (!elim || elim.stage === 'search') throw new Error('Still searching');
+  if (!elim || elim.stage !== 'lighting') throw new Error('Not lighting eliminated yet');
 
   const nextId = elim.wrongIds.find((id) => !elim.revealedIds.includes(id));
   if (!nextId) {

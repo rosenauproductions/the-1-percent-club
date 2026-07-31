@@ -55,6 +55,35 @@
   color: var(--text-muted);
 }
 
+.hero .pct {
+  color: var(--club-cyan);
+}
+
+.volume-gate__copy {
+  margin-top: 1.25rem !important;
+  font-size: 1.15rem;
+  line-height: 1.45;
+  color: var(--text) !important;
+  max-width: 22rem;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.volume-gate__copy strong {
+  color: var(--club-gold, #ffd54a);
+}
+
+.volume-gate__hint {
+  text-align: center;
+  font-size: 0.85rem;
+}
+
+.volume-gate__reminder {
+  margin-top: 0.65rem !important;
+  font-size: 0.9rem;
+  color: var(--club-gold, #ffd54a) !important;
+}
+
 .card {
   background: rgba(13, 34, 88, 0.55);
   border: 1px solid rgba(46, 230, 255, 0.18);
@@ -177,7 +206,7 @@ body.is-eliminated .play-header {
   border-bottom-color: rgba(70, 120, 210, 0.35);
 }
 
-/* Search phase — all active phones fade green → blue with eliminating.mp3 */
+/* Optional search-style fade (unused; elim waits for host Show eliminated) */
 body.elim-searching {
   animation: elim-fade-green-blue 4.4s ease-in-out forwards;
 }

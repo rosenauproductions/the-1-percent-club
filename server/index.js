@@ -19,7 +19,7 @@ import {
   submitAnswer,
   usePass,
   endAnsweringWithForces,
-  finishEliminationSearch,
+  showResults,
   revealNextEliminated,
   advanceAfterReveal,
   hostOverride,
@@ -49,7 +49,6 @@ const PORT = Number(process.env.PORT) || 3457;
 let state = createInitialState();
 const clients = new Set();
 let answerTimer = null;
-let elimSearchTimer = null;
 let elimRevealTimer = null;
 
 function clearAnswerTimer() {
@@ -60,10 +59,6 @@ function clearAnswerTimer() {
 }
 
 function clearElimTimers() {
-  if (elimSearchTimer) {
-    clearTimeout(elimSearchTimer);
-    elimSearchTimer = null;
-  }
   if (elimRevealTimer) {
     clearTimeout(elimRevealTimer);
     elimRevealTimer = null;
@@ -79,28 +74,11 @@ function scheduleAnswerTimer() {
       if (state.phase === 'answering') {
         state = endAnsweringWithForces(state);
         broadcast();
-        scheduleEliminationSequence();
       }
     } catch {
       // ignore
     }
   }, delay + 50);
-}
-
-function scheduleEliminationSequence() {
-  clearElimTimers();
-  if (state.phase !== 'eliminating' || state.elimination?.stage !== 'search') return;
-
-  const delay = Math.max(0, (state.elimination.searchEndsAt || Date.now()) - Date.now());
-  elimSearchTimer = setTimeout(() => {
-    try {
-      state = finishEliminationSearch(state);
-      broadcast();
-      scheduleNextElimLight(200);
-    } catch {
-      // ignore
-    }
-  }, delay);
 }
 
 function scheduleNextElimLight(delay = ELIM_REVEAL_GAP_MS) {
@@ -254,7 +232,16 @@ async function handleAction(action, payload = {}, meta = {}) {
       clearAnswerTimer();
       clearElimTimers();
       state = endAnsweringWithForces(state);
-      scheduleEliminationSequence();
+      break;
+
+    case 'show_results':
+    case 'show_eliminated':
+      requireHost(role);
+      clearElimTimers();
+      state = showResults(state);
+      if (state.phase === 'eliminating') {
+        scheduleNextElimLight(ELIM_REVEAL_GAP_MS);
+      }
       break;
 
     case 'host_override':
@@ -267,15 +254,6 @@ async function handleAction(action, payload = {}, meta = {}) {
       clearElimTimers();
       state = advanceAfterReveal(state);
       if (state.phase === 'answering') scheduleAnswerTimer();
-      break;
-
-    case 'elim_search_done':
-      // Optional early trigger from display when audio ends
-      if (state.phase === 'eliminating' && state.elimination?.stage === 'search') {
-        clearElimTimers();
-        state = finishEliminationSearch(state);
-        scheduleNextElimLight(200);
-      }
       break;
 
     case 'cashout_decide':

@@ -4,7 +4,6 @@ const DEFAULT_SOUNDS = {
   timer: 'timer.mp3',
   lock: 'lock.mp3',
   correct: 'correct.mp3',
-  eliminating: 'eliminating.mp3',
   eliminate: 'eliminate.mp3',
   youre_out: 'youre-out.mp3',
   pass: 'pass.mp3',
@@ -108,7 +107,10 @@ async function beginPlayback(audio, targetVolume, { name, loop }) {
   return true;
 }
 
-export async function playSound(name, { loop = false, volume = masterVolume } = {}) {
+export async function playSound(
+  name,
+  { loop = false, volume = masterVolume, asMusic = loop } = {},
+) {
   const src = soundSrc(name);
   if (!src) return null;
 
@@ -118,15 +120,18 @@ export async function playSound(name, { loop = false, volume = masterVolume } = 
   audio.volume = targetVolume;
   audio.loop = loop;
 
-  if (loop) stopAllMusic();
+  if (asMusic) stopAllMusic();
 
   const started = await beginPlayback(audio, targetVolume, { name, loop });
   if (!started) return null;
 
-  if (loop) musicTracks.add(audio);
+  if (asMusic) musicTracks.add(audio);
 
   if (!loop) {
-    audio.addEventListener('ended', () => audio.remove());
+    audio.addEventListener('ended', () => {
+      musicTracks.delete(audio);
+      audio.remove();
+    });
     pendingSfx = null;
   }
 
