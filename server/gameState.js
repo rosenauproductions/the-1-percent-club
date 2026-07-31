@@ -879,10 +879,17 @@ export function finalizeElimination(state) {
 
 export function advanceAfterReveal(state) {
   // Host-driven boards: eliminated → remain → jackpot → next question
+  // If nobody left, skip remain/jackpot and end the game after the outs board.
   if (state.phase === 'eliminated_count') {
+    if (state.pendingAfterReveal === 'game_end' || activePlayers(state).length === 0) {
+      return continueAfterBoards(state);
+    }
     return enterLeftCount(state);
   }
   if (state.phase === 'left_count') {
+    if (state.pendingAfterReveal === 'game_end' || activePlayers(state).length === 0) {
+      return continueAfterBoards(state);
+    }
     return enterPrizePot(state);
   }
   if (state.phase === 'prize_pot') {

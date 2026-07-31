@@ -311,13 +311,14 @@ function renderEliminating() {
 }
 
 function renderEliminatedCount() {
-  const out =
+  const out = Number(
     state.reveal?.eliminated ??
-    state.elimination?.wrongIds?.length ??
-    state.players.filter((p) => p.status === 'out').length;
+      state.elimination?.wrongIds?.length ??
+      state.players.filter((p) => p.status === 'out').length,
+  );
   main.innerHTML = `
     <div class="left-count-board">
-      <div class="left-count-board__value">${out}</div>
+      <div class="left-count-board__value">${Number.isFinite(out) ? out : 0}</div>
       <div class="left-count-board__label">eliminated</div>
       <p class="left-count-board__sub">players out this round</p>
     </div>
@@ -497,7 +498,14 @@ function render() {
       renderGameEnd();
       break;
     default:
-      main.innerHTML = `<div class="center-phase"><h1>${escapeHtml(state.phase)}</h1></div>`;
+      // Fallback if a deploy races ahead of cached clients
+      if (state.phase === 'eliminated_count') {
+        renderEliminatedCount();
+      } else if (state.phase === 'left_count') {
+        renderLeftCount();
+      } else {
+        main.innerHTML = `<div class="center-phase"><h1>${escapeHtml(state.phase)}</h1></div>`;
+      }
   }
 }
 

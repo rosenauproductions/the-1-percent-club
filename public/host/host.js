@@ -308,14 +308,27 @@ function render() {
     case 'answering':
       renderQuestion();
       break;
-    case 'eliminated_count':
+    case 'eliminated_count': {
+      const outCount =
+        state.reveal?.eliminated ??
+        state.elimination?.wrongIds?.length ??
+        state.players.filter((p) => p.status === 'out').length;
+      const allOut =
+        state.pendingAfterReveal === 'game_end' || activePlayers().length === 0;
       main.innerHTML = `
         <div class="card">
-          <h2>${state.reveal?.eliminated ?? 0} eliminated</h2>
-          <p class="muted">TV is showing how many went out this round.</p>
-          <button class="btn-primary big-btn" style="margin-top:0.85rem" data-act="advance">Show who remains</button>
+          <h2>${outCount} eliminated</h2>
+          <p class="muted">${
+            allOut
+              ? 'Everyone is out this round. TV is on the eliminated board.'
+              : 'TV is showing how many went out this round.'
+          }</p>
+          <button class="btn-primary big-btn" style="margin-top:0.85rem" data-act="advance">
+            ${allOut ? 'End game' : 'Show who remains'}
+          </button>
         </div>`;
       break;
+    }
     case 'left_count':
       main.innerHTML = `
         <div class="card">
@@ -386,7 +399,13 @@ function render() {
       renderFinale();
       break;
     default:
-      main.innerHTML = `<div class="card"><h2>${escapeHtml(state.phase)}</h2></div>`;
+      main.innerHTML = `
+        <div class="card">
+          <h2>${escapeHtml(state.phase)}</h2>
+          <p class="muted">Unexpected host screen — try Advance or Reset.</p>
+          <button class="btn-primary big-btn" style="margin-top:0.85rem" data-act="advance">Advance</button>
+          <button class="btn-danger" style="margin-top:0.5rem" data-act="reset_lobby">Reset to lobby</button>
+        </div>`;
   }
 }
 

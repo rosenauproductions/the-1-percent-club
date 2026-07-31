@@ -402,7 +402,16 @@ async function handleAction(action, payload = {}, meta = {}) {
 
 const app = express();
 app.use(express.json({ limit: '1mb' }));
-app.use(express.static(PUBLIC_DIR));
+// Avoid stale host/display/play JS after deploys (browsers were caching old clients)
+app.use(
+  express.static(PUBLIC_DIR, {
+    setHeaders(res, filePath) {
+      if (/\.(js|css|html)$/i.test(filePath)) {
+        res.setHeader('Cache-Control', 'no-cache');
+      }
+    },
+  }),
+);
 
 app.get('/api/state', (req, res) => {
   const role = req.headers['x-client-role'] || req.query.role || 'display';
