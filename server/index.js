@@ -50,6 +50,7 @@ let state = createInitialState();
 const clients = new Set();
 let answerTimer = null;
 let elimRevealTimer = null;
+let soundCueClearTimer = null;
 
 function clearAnswerTimer() {
   if (answerTimer) {
@@ -101,12 +102,30 @@ function clientView(ws) {
   return sanitizeStateForClient(state, ws.role, ws.playerId ?? null);
 }
 
+function scheduleSoundCueClear() {
+  if (soundCueClearTimer) {
+    clearTimeout(soundCueClearTimer);
+    soundCueClearTimer = null;
+  }
+  const cue = state.soundCue;
+  if (!cue?.at) return;
+  // Give phones time to receive eliminate / other cues before clearing.
+  const delay = cue.name === 'eliminate' ? 2500 : 1200;
+  soundCueClearTimer = setTimeout(() => {
+    if (state.soundCue?.at === cue.at) {
+      state = clearSoundCue(state);
+      broadcast();
+    }
+  }, delay);
+}
+
 function broadcast() {
   for (const client of clients) {
     if (client.readyState === 1) {
       client.send(JSON.stringify({ type: 'state', state: clientView(client) }));
     }
   }
+  scheduleSoundCueClear();
 }
 
 function updateConnectionFlags() {

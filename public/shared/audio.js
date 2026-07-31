@@ -17,6 +17,42 @@ const musicTracks = new Set();
 let audioActivated = false;
 let pendingSfx = null;
 const mutedPending = new Set();
+let audioCtx = null;
+let lastPlayResult = 'idle';
+let lastCueSeen = null;
+const listeners = new Set();
+
+function notify() {
+  for (const fn of listeners) {
+    try {
+      fn(getAudioDebug());
+    } catch {
+      // ignore
+    }
+  }
+}
+
+export function onAudioDebug(fn) {
+  listeners.add(fn);
+  fn(getAudioDebug());
+  return () => listeners.delete(fn);
+}
+
+export function getAudioDebug() {
+  return {
+    activated: audioActivated,
+    ctxState: audioCtx?.state || 'none',
+    masterVolume,
+    lastPlayResult,
+    lastCueSeen,
+  };
+}
+
+export function noteSoundCue(cue) {
+  if (!cue) return;
+  lastCueSeen = `${cue.name} @ ${cue.at}`;
+  notify();
+}
 
 export function isAudioActivated() {
   return audioActivated;
@@ -44,11 +80,43 @@ function releaseMutedPending() {
   }
 }
 
-/** Unmutes audio when a strict browser required muted autoplay first. */
-export function activateAudio() {
-  if (audioActivated) return;
+/**
+ * Unlock mobile audio inside a user gesture.
+ * iOS/Safari need a real play() (and usually AudioContext.resume) before later SFX work.
+ */
+export async function activateAudio() {
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (AC) {
+      if (!audioCtx) audioCtx = new AC();
+      if (audioCtx.state === 'suspended') await audioCtx.resume();
+    }
+  } catch (err) {
+    lastPlayResult = `ctx fail: ${err?.message || err}`;
+  }
+
+  // Near-silent prime so later HTMLAudioElement.play() is allowed
+  try {
+    const src = soundSrc('lock');
+    if (src) {
+      const primer = new Audio(src);
+      primer.volume = 0.01;
+      await primer.play();
+      primer.pause();
+      primer.currentTime = 0;
+    }
+  } catch (err) {
+    lastPlayResult = `unlock fail: ${err?.message || err}`;
+    notify();
+    return false;
+  }
+
   audioActivated = true;
   releaseMutedPending();
+  lastPlayResult = `unlocked (ctx ${audioCtx?.state || 'n/a'})`;
+  notify();
+  await replayPendingSfx();
+  return true;
 }
 
 export function configureSounds(sounds) {
@@ -57,6 +125,7 @@ export function configureSounds(sounds) {
 
 export function setMasterVolume(v) {
   masterVolume = v;
+  notify();
 }
 
 function soundSrc(name) {
@@ -79,7 +148,9 @@ async function beginPlayback(audio, targetVolume, { name, loop }) {
     try {
       await audio.play();
       return true;
-    } catch {
+    } catch (err) {
+      lastPlayResult = `${name} blocked: ${err?.message || err}`;
+      notify();
       return false;
     }
   }
@@ -98,8 +169,10 @@ async function beginPlayback(audio, targetVolume, { name, loop }) {
 
   try {
     await audio.play();
-  } catch {
+  } catch (err) {
     pendingSfx = { name, loop, volume: targetVolume };
+    lastPlayResult = `${name} pending: ${err?.message || err}`;
+    notify();
     return false;
   }
 
@@ -112,7 +185,11 @@ export async function playSound(
   { loop = false, volume = masterVolume, asMusic = loop } = {},
 ) {
   const src = soundSrc(name);
-  if (!src) return null;
+  if (!src) {
+    lastPlayResult = `${name}: missing file`;
+    notify();
+    return null;
+  }
 
   const audio = new Audio(src);
   const targetVolume = Math.max(0, Math.min(1, volume));
@@ -135,6 +212,8 @@ export async function playSound(
     pendingSfx = null;
   }
 
+  lastPlayResult = `${name} ok @ ${Math.round(targetVolume * 100)}%`;
+  notify();
   return audio;
 }
 
@@ -143,4 +222,12 @@ export async function replayPendingSfx() {
   const { name, loop, volume } = pendingSfx;
   pendingSfx = null;
   return playSound(name, { loop, volume });
+}
+
+/** Audible confirmation for volume-gate / QA test (full-blast eliminate). */
+export async function playTestTone() {
+  await activateAudio();
+  if (!audioActivated) return false;
+  await playSound('eliminate', { volume: 1 });
+  return true;
 }

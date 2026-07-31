@@ -1,19 +1,16 @@
 import { connect, sendAction, setPlayerId } from '../shared/ws.js';
 import { installErrorHandlers, mountQaWidget, showBoot, hideBoot } from '../shared/boot.js';
-import { activateAudio, playSound } from '../shared/audio.js';
+import {
+  activateAudio,
+  playSound,
+  playTestTone,
+  noteSoundCue,
+  isAudioActivated,
+} from '../shared/audio.js';
 
 installErrorHandlers('play');
-mountQaWidget('play');
+mountQaWidget('play', { audioTools: true });
 showBoot('Connecting to server…');
-
-// Unlock mobile audio on first tap (needed before we can play "you're out")
-window.addEventListener(
-  'pointerdown',
-  () => {
-    activateAudio();
-  },
-  { passive: true },
-);
 
 const STORAGE_KEY = 'club_player_v1';
 const VOLUME_KEY = 'club_volume_ok_v1';
@@ -89,19 +86,25 @@ async function act(action, payload = {}) {
 
 function renderVolumeGate() {
   meta.textContent = 'Volume check';
+  const returning = volumeReady && !isAudioActivated();
   main.innerHTML = `
     <div class="hero">
       <h1>THE <span class="pct">1%</span> CLUB</h1>
       <p class="volume-gate__copy">
-        Make sure your phone or device volume is at <strong>100%</strong> before playing.
+        ${
+          returning
+            ? 'Tap below to re-enable phone sound for this visit.'
+            : 'Make sure your phone or device volume is at <strong>100%</strong> before playing.'
+        }
       </p>
     </div>
     <div class="card">
       <div class="stack">
         <button class="btn-primary big-btn" id="volumeOkBtn" type="button">
-          Volume is at 100% — continue
+          ${returning ? 'Enable sound — play test' : 'Volume is at 100% — play test sound'}
         </button>
-        <p class="muted volume-gate__hint">Blue-light sounds play on your phone when you are out.</p>
+        <p class="muted volume-gate__hint">You should hear the blue-light sound. Tap QA anytime to retest.</p>
+        <p class="error" id="volumeGateError" style="display:none"></p>
       </div>
     </div>
   `;
@@ -380,7 +383,8 @@ function renderWatch() {
 }
 
 function render() {
-  if (!volumeReady) {
+  // New page loads must unlock audio again (iOS); session flag alone is not enough.
+  if (!volumeReady || !isAudioActivated()) {
     renderVolumeGate();
     return;
   }
@@ -476,10 +480,29 @@ main.addEventListener('click', async (e) => {
 
   try {
     if (t.id === 'volumeOkBtn') {
-      activateAudio();
-      volumeReady = true;
-      sessionStorage.setItem(VOLUME_KEY, '1');
-      render();
+      const errEl = document.getElementById('volumeGateError');
+      if (errEl) {
+        errEl.style.display = 'none';
+        errEl.textContent = '';
+      }
+      t.disabled = true;
+      t.textContent = 'Playing test…';
+      try {
+        const ok = await playTestTone();
+        if (!ok && !isAudioActivated()) {
+          throw new Error('Browser blocked sound — tap again, or check silent/mute switch');
+        }
+        volumeReady = true;
+        sessionStorage.setItem(VOLUME_KEY, '1');
+        render();
+      } catch (err) {
+        t.disabled = false;
+        t.textContent = 'Volume is at 100% — play test sound';
+        if (errEl) {
+          errEl.style.display = 'block';
+          errEl.textContent = err.message || 'Could not play sound';
+        }
+      }
       return;
     }
     if (t.id === 'joinBtn') {
@@ -561,17 +584,22 @@ function syncEliminationUi(p) {
   document.body.classList.toggle('is-eliminated', !!(amLit && p?.status === 'out'));
 }
 
+async function playOutSting() {
+  playedOutSound = true;
+  // Must already be unlocked from volume gate / QA — play() outside gesture fails on iOS otherwise
+  await playSound('eliminate', { volume: 1 });
+  await playSound('youre_out', { volume: 1 });
+}
+
 function handlePlayerSoundCue(cue) {
   if (!cue || cue.at === lastPlaySoundAt) return;
   lastPlaySoundAt = cue.at;
+  noteSoundCue(cue);
 
   if (cue.name === 'eliminate') {
     const elim = state?.elimination;
     if (elim?.currentId && elim.currentId === playerId) {
-      activateAudio();
-      playSound('eliminate', { volume: 1 }).catch(() => {});
-      playSound('youre_out', { volume: 1 }).catch(() => {});
-      playedOutSound = true;
+      playOutSting().catch(() => {});
     }
   }
 }
@@ -584,10 +612,7 @@ function maybePlayOutSound(p) {
     return;
   }
   if (p.status === 'out' && prevStatus !== 'out' && !playedOutSound) {
-    playedOutSound = true;
-    activateAudio();
-    playSound('eliminate', { volume: 1 }).catch(() => {});
-    playSound('youre_out', { volume: 1 }).catch(() => {});
+    playOutSting().catch(() => {});
   }
   prevStatus = p.status;
 }
@@ -595,10 +620,11 @@ function maybePlayOutSound(p) {
 function onState(next) {
   state = next;
   hideBoot();
+  if (next.soundCue) noteSoundCue(next.soundCue);
   const p = me();
   syncEliminationUi(p);
-  maybePlayOutSound(p);
   handlePlayerSoundCue(next.soundCue);
+  maybePlayOutSound(p);
   render();
   if (tick) clearInterval(tick);
   if (state.phase === 'answering') tick = setInterval(updateTimerOnly, 200);

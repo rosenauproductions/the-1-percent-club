@@ -135,3 +135,55 @@
 .qa-panel a {
   color: #2ee6ff;
 }
+
+.qa-audio {
+  margin: 0 0 0.75rem;
+  padding: 0.65rem;
+  border-radius: 10px;
+  background: rgba(46, 230, 255, 0.08);
+  border: 1px solid rgba(46, 230, 255, 0.22);
+}
+
+.qa-audio h4 {
+  margin: 0 0 0.4rem;
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #2ee6ff;
+}
+
+.qa-audio-status {
+  font-size: 0.75rem;
+  line-height: 1.35;
+  color: #c9d7f0;
+  margin-bottom: 0.55rem;
+  word-break: break-word;
+}
+
+.qa-audio-actions {
+  display: flex;
+  gap: 0.45rem;
+}
+
+.qa-audio-btn {
+  flex: 1;
+  border: none;
+  border-radius: 8px;
+  padding: 0.6rem;
+  font: 700 0.8rem system-ui, sans-serif;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.1);
+  color: #f4f8ff;
+}
+
+.qa-audio-btn--primary {
+  background: linear-gradient(180deg, #ffe27a, #ffd54a);
+  color: #1a1400;
+}
+
+.qa-audio-hint {
+  margin: 0.45rem 0 0;
+  font-size: 0.72rem;
+  color: #8aa0c8;
+  line-height: 1.35;
+}

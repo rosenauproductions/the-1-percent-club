@@ -431,10 +431,13 @@ async function handleSoundCue(cue) {
     asMusic: looping || cue.name === 'intro',
     ...(volume != null ? { volume } : {}),
   });
-  try {
-    await sendAction('clear_sound');
-  } catch {
-    // ignore
+  // Delay clear so phones still receive eliminate cues (display used to clear instantly).
+  if (cue.name !== 'eliminate') {
+    try {
+      await sendAction('clear_sound');
+    } catch {
+      // ignore — server also TTL-clears cues
+    }
   }
 }
 

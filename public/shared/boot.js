@@ -1,4 +1,12 @@
-/** Connection banner + floating QA feedback widget */
+/** Connection banner + floating QA feedback widget (+ audio tools) */
+
+import {
+  activateAudio,
+  getAudioDebug,
+  onAudioDebug,
+  playTestTone,
+  isAudioActivated,
+} from './audio.js';
 
 export function showBoot(message, { error = false } = {}) {
   let el = document.getElementById('bootBanner');
@@ -37,15 +45,24 @@ function escapeHtml(s) {
     .replace(/>/g, '&gt;');
 }
 
-export function mountQaWidget(screenName) {
+function formatAudioDebug(d) {
+  return `Audio: ${d.activated ? 'UNLOCKED' : 'LOCKED'} · ctx ${d.ctxState}<br/>Last: ${escapeHtml(d.lastPlayResult || '—')}<br/>Cue: ${escapeHtml(d.lastCueSeen || '—')}`;
+}
+
+/**
+ * @param {string} screenName
+ * @param {{ audioTools?: boolean }} [options]
+ */
+export function mountQaWidget(screenName, options = {}) {
   if (document.getElementById('qaFab')) return;
+  const audioTools = options.audioTools !== false;
 
   const fab = document.createElement('button');
   fab.id = 'qaFab';
   fab.className = 'qa-fab';
   fab.type = 'button';
   fab.textContent = 'QA';
-  fab.title = 'Send feedback';
+  fab.title = 'Send feedback / audio tools';
 
   const panel = document.createElement('div');
   panel.id = 'qaPanel';
@@ -56,11 +73,25 @@ export function mountQaWidget(screenName) {
       Screen: <strong>${escapeHtml(screenName)}</strong> ·
       <a href="/qa/" target="_blank" rel="noopener">Open QA board</a>
     </p>
+    ${
+      audioTools
+        ? `<div class="qa-audio">
+      <h4>Audio</h4>
+      <div class="qa-audio-status" id="qaAudioStatus">${formatAudioDebug(getAudioDebug())}</div>
+      <div class="qa-audio-actions">
+        <button type="button" class="qa-audio-btn" id="qaUnlockAudio">Unlock</button>
+        <button type="button" class="qa-audio-btn qa-audio-btn--primary" id="qaTestAudio">Test sound</button>
+      </div>
+      <p class="qa-audio-hint">On phones: unlock/test must be a tap. You should hear eliminate.mp3.</p>
+    </div>`
+        : ''
+    }
     <label>Type
       <select id="qaType">
         <option value="bug">Bug</option>
         <option value="ux">UX / look</option>
         <option value="rules">Rules / gameplay</option>
+        <option value="audio">Audio</option>
         <option value="idea">Idea</option>
         <option value="other">Other</option>
       </select>
@@ -91,11 +122,38 @@ export function mountQaWidget(screenName) {
 
   fab.addEventListener('click', () => panel.classList.toggle('open'));
   panel.querySelector('#qaCancel').addEventListener('click', () => panel.classList.remove('open'));
+
+  if (audioTools) {
+    const statusEl = panel.querySelector('#qaAudioStatus');
+    onAudioDebug((d) => {
+      if (statusEl) statusEl.innerHTML = formatAudioDebug(d);
+    });
+    panel.querySelector('#qaUnlockAudio')?.addEventListener('click', async () => {
+      await activateAudio();
+    });
+    panel.querySelector('#qaTestAudio')?.addEventListener('click', async () => {
+      const status = panel.querySelector('#qaStatus');
+      status.classList.remove('err');
+      status.textContent = 'Playing test…';
+      try {
+        const ok = await playTestTone();
+        status.textContent = ok || isAudioActivated()
+          ? 'Test played — did you hear it?'
+          : 'Test failed — tap Unlock first';
+        if (!ok && !isAudioActivated()) status.classList.add('err');
+      } catch (err) {
+        status.classList.add('err');
+        status.textContent = err.message || 'Test failed';
+      }
+    });
+  }
+
   panel.querySelector('#qaSubmit').addEventListener('click', async () => {
     const status = panel.querySelector('#qaStatus');
     status.classList.remove('err');
     status.textContent = 'Sending…';
     try {
+      const audio = getAudioDebug();
       const res = await fetch('/api/feedback', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -107,6 +165,7 @@ export function mountQaWidget(screenName) {
           name: panel.querySelector('#qaName').value,
           url: location.href,
           userAgent: navigator.userAgent,
+          audio,
         }),
       });
       const data = await res.json();
