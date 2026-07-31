@@ -197,6 +197,20 @@ input[type='text'] {
   color: var(--text-muted);
 }
 
+/* Quick blue flash when this contestant is lit wrong */
+body.elim-flash {
+  animation: play-elim-flash 0.45s ease-out;
+}
+
+@keyframes play-elim-flash {
+  0% {
+    background: radial-gradient(ellipse at 50% 35%, #8ec5ff 0%, #1e4a9a 45%, #020617 100%);
+  }
+  100% {
+    background: #020617;
+  }
+}
+
 /* Eliminated — down-casting blue spotlight */
 body.is-eliminated {
   background: #020617;

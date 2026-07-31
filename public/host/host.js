@@ -358,7 +358,11 @@ function render() {
                 ? `Clean round sting — TV ${state.elimination?.stingTimes || 1}× eliminating.mp3`
                 : sting
                   ? `Scanning… ${sound}${
-                      sound === 'eliminating' ? ` × ${state.elimination?.stingTimes || 1} (TV)` : ' (phones)'
+                      sound === 'eliminating'
+                        ? ` × ${state.elimination?.stingTimes || 1}`
+                        : sound === 'thump'
+                          ? ' (phones; TV soft)'
+                          : ''
                     }`
                   : `Lighting out ${state.elimination?.revealedCount || 0} / ${state.elimination?.wrongIds?.length || 0}`
             }</p>

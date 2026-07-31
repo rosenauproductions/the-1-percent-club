@@ -57,9 +57,23 @@ function defaultSetup() {
 
 /** Estimated length of one eliminating.mp3 play (server fallback timer). */
 export const ELIM_STING_MS = 900;
-/** Estimated length of thump.mp3 (play-only sting). */
-export const THUMP_MS = 700;
-export const ELIM_REVEAL_GAP_MS = 1200;
+/** Estimated length of thump.mp3 (phones primary; TV soft). */
+export const THUMP_MS = 1200;
+/** Default / legacy gap after a blue light (prefer thumpGapMs). */
+export const ELIM_REVEAL_GAP_MS = 1000;
+
+/**
+ * Silence after lighting a wrong player before the next thump starts.
+ * First 2 outs → 1s; next 3 → 0.75s; rest → 0.5s.
+ * @param {number} revealedCount how many wrongs have been lit so far
+ */
+export function thumpGapMs(revealedCount) {
+  const n = Number(revealedCount) || 0;
+  if (n <= 2) return 1000;
+  if (n <= 5) return 750;
+  return 500;
+}
+
 /** How long to hold the "X left" board before prize pot */
 export const LEFT_COUNT_MS = 3200;
 /** How long to hold the prize-pot spectacle before the answer reveal */
@@ -651,7 +665,7 @@ function computePendingAfterReveal(state, wrongIds) {
 /**
  * Host pressed "Show who is right and wrong".
  * Clean round → TV eliminating.mp3 × 1–3, then reveal.
- * Wrongs → phone thump per contestant until the last; last gets TV eliminating × 1–3, then blue light.
+ * Wrongs → thump per contestant until the last; last gets eliminating × 1–3, then blue light.
  */
 export function showResults(state) {
   if (state.phase !== 'eliminating' || state.elimination?.stage !== 'pending') {
@@ -731,7 +745,7 @@ export function enterAnswerReveal(state) {
 
 /**
  * Sting before the next blue light.
- * Non-last wrong → thump on phones. Last wrong → eliminating × 1–3 on phones + TV.
+ * Non-last wrong → thump (phones loud, TV soft). Last wrong → eliminating × 1–3.
  */
 export function startEliminationSting(state) {
   if (state.phase !== 'eliminating') throw new Error('Not eliminating');
@@ -747,8 +761,8 @@ export function startEliminationSting(state) {
   const isLast = remaining.length === 1;
   const times = isLast ? 1 + Math.floor(Math.random() * 3) : 1;
   const soundName = isLast ? 'eliminating' : 'thump';
-  // thump = phones only; eliminating = phones + TV
-  const audience = isLast ? 'all' : 'play';
+  // both clients hear; play.js at 100%, display at 20% for thump
+  const audience = 'all';
 
   return actionMeta(
     cue(

@@ -648,6 +648,8 @@ main.addEventListener('keydown', (e) => {
   }
 });
 
+let lastFlashCurrentId = null;
+
 function syncEliminationUi(p) {
   const elim = state?.elimination;
   const searching =
@@ -658,9 +660,29 @@ function syncEliminationUi(p) {
     p &&
     (p.status === 'out' || elim?.revealedIds?.includes(p.id) || elim?.currentId === p.id)
   );
+  const flashMe =
+    state?.phase === 'eliminating' &&
+    elim?.stage === 'lighting' &&
+    p &&
+    elim.currentId === p.id;
 
   document.body.classList.toggle('elim-searching', !!searching);
   document.body.classList.toggle('is-eliminated', !!(amLit && p?.status === 'out'));
+
+  // Quick blue flash when this phone is lit wrong
+  if (flashMe && elim.currentId !== lastFlashCurrentId) {
+    lastFlashCurrentId = elim.currentId;
+    document.body.classList.remove('elim-flash');
+    // reflow so animation restarts
+    void document.body.offsetWidth;
+    document.body.classList.add('elim-flash');
+    window.setTimeout(() => {
+      document.body.classList.remove('elim-flash');
+    }, 500);
+  }
+  if (!flashMe && elim?.stage !== 'lighting') {
+    lastFlashCurrentId = null;
+  }
 }
 
 async function playOutSting() {
@@ -682,7 +704,7 @@ function handlePlayerSoundCue(cue) {
     return;
   }
 
-  // Phone-only thump before each non-last wrong blue light
+  // thump before each non-last wrong — phones carry it (TV soft at 20%)
   if (cue.name === 'thump') {
     const times = cue.times || 1;
     playSoundTimes('thump', times, { volume: 1 }).catch(() => {});

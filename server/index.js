@@ -39,7 +39,7 @@ import {
   sanitizeStateForClient,
   activeCount,
   createJoinCode,
-  ELIM_REVEAL_GAP_MS,
+  thumpGapMs,
 } from './gameState.js';
 import { MDNS_NAME, networkInfo } from './network.js';
 import { Bonjour } from 'bonjour-service';
@@ -118,7 +118,11 @@ function scheduleElimStingFallback() {
   }, delay);
 }
 
-function scheduleAfterElimLight(delay = ELIM_REVEAL_GAP_MS) {
+function nextThumpGap() {
+  return thumpGapMs(state.elimination?.revealedCount ?? 0);
+}
+
+function scheduleAfterElimLight(delay = nextThumpGap()) {
   if (elimRevealTimer) clearTimeout(elimRevealTimer);
   elimRevealTimer = setTimeout(() => {
     try {
@@ -339,7 +343,7 @@ async function handleAction(action, payload = {}, meta = {}) {
       break;
 
     case 'elim_sting_done':
-      // TV finished eliminating sting (clean round or last wrong) — advance
+      // TV finished thump / eliminating sting — advance
       if (state.phase === 'eliminating' && state.elimination?.stage === 'clean_sting') {
         clearElimTimers();
         state = finishCleanSting(state);

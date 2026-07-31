@@ -245,6 +245,32 @@ body.display-body {
   to { filter: brightness(1.15); }
 }
 
+/* Quick blue flash when this contestant is lit wrong */
+.seat.flash-out {
+  color: #eef5ff;
+  border-color: rgba(140, 190, 255, 0.95);
+  animation: seat-flash-out 0.45s ease-out forwards;
+}
+
+@keyframes seat-flash-out {
+  0% {
+    background: #7eb6ff;
+    box-shadow: 0 0 28px rgba(120, 180, 255, 0.95), 0 0 48px rgba(60, 120, 255, 0.7);
+    filter: brightness(1.35);
+  }
+  55% {
+    background: linear-gradient(180deg, rgba(110, 170, 255, 0.75), rgba(40, 80, 180, 0.7));
+    box-shadow: 0 0 22px rgba(90, 150, 255, 0.8);
+    filter: brightness(1.15);
+  }
+  100% {
+    background: linear-gradient(180deg, rgba(90, 140, 220, 0.45), rgba(30, 60, 130, 0.55));
+    box-shadow: 0 0 10px rgba(58, 107, 181, 0.35);
+    filter: brightness(1);
+    opacity: 0.9;
+  }
+}
+
 .seat.out {
   background: linear-gradient(180deg, rgba(90, 140, 220, 0.45), rgba(30, 60, 130, 0.55));
   color: #c5d8ff;

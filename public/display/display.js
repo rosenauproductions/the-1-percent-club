@@ -32,15 +32,19 @@ function seatClass(p) {
   if (p.status === 'winner') return 'winner';
   if (p.status === 'cashed' || p.status === 'took10k') return p.status;
   const elim = state?.elimination;
+  // Just lit — bright blue flash, then settles to out
+  if (elim?.stage === 'lighting' && elim.currentId === p.id) {
+    return 'flash-out';
+  }
   if (p.status === 'out' || elim?.revealedIds?.includes(p.id)) return 'out';
   if (elim?.stage === 'clean_sting' && p.status === 'active') {
     return 'searching';
   }
+  // Only the next target pulses during sting (one-at-a-time)
   if (
-    (elim?.stage === 'sting' || elim?.stage === 'lighting') &&
+    elim?.stage === 'sting' &&
     p.status === 'active' &&
-    elim.wrongIds?.includes(p.id) &&
-    !elim.revealedIds?.includes(p.id)
+    elim.stingTargetId === p.id
   ) {
     return 'searching';
   }
@@ -477,8 +481,8 @@ async function handleSoundCue(cue) {
   if (!cue || cue.at === lastSoundAt) return;
   lastSoundAt = cue.at;
 
-  // Phone-only cues — TV stays silent (server timer advances the sting)
-  if (cue.audience === 'play' || cue.name === 'thump') {
+  // Legacy phone-only cues (if any) — TV stays silent; server timer advances
+  if (cue.audience === 'play' && cue.name !== 'thump') {
     return;
   }
 
@@ -488,6 +492,7 @@ async function handleSoundCue(cue) {
     looping ||
     cue.name === 'intro' ||
     cue.name === 'timer' ||
+    cue.name === 'thump' ||
     cue.name === 'eliminating' ||
     cue.name === 'eliminate' ||
     cue.name === 'correct' ||
@@ -497,6 +502,18 @@ async function handleSoundCue(cue) {
   // jackpot sting at full TV presence for the pot board
   if (cue.name === 'jackpot') {
     await playSound('jackpot', { volume: 0.85 });
+    return;
+  }
+
+  // thump.mp3 — soft on TV (phones carry it); still advances the sting
+  if (cue.name === 'thump') {
+    const times = cue.times || state?.elimination?.stingTimes || 1;
+    await playSoundTimes('thump', times, { volume: 0.2 });
+    try {
+      await sendAction('elim_sting_done');
+    } catch {
+      // server fallback timer will advance
+    }
     return;
   }
 
