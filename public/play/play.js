@@ -1,7 +1,6 @@
 import { connect, sendAction, setPlayerId } from '../shared/ws.js';
 import { installErrorHandlers, mountQaWidget, showBoot, hideBoot } from '../shared/boot.js';
 import {
-  activateAudio,
   playSound,
   playTestTone,
   noteSoundCue,
@@ -25,7 +24,10 @@ let tick = null;
 let prevStatus = null;
 let playedOutSound = false;
 let lastPlaySoundAt = null;
-let volumeReady = sessionStorage.getItem(VOLUME_KEY) === '1';
+/** Set only after they confirm they heard the test sound this visit. */
+let volumeReady = false;
+/** 'ask' = play sound · 'confirm' = did you hear it? */
+let volumeGateStep = 'ask';
 
 const params = new URLSearchParams(location.search);
 const presetCode = (params.get('code') || '').toUpperCase();
@@ -85,29 +87,81 @@ async function act(action, payload = {}) {
 }
 
 function renderVolumeGate() {
-  meta.textContent = 'Volume check';
-  const returning = volumeReady && !isAudioActivated();
+  meta.textContent = 'Sound check';
+  if (volumeGateStep === 'confirm') {
+    main.innerHTML = `
+      <div class="hero">
+        <h1>THE <span class="pct">1%</span> CLUB</h1>
+        <p class="volume-gate__copy">Can you hear that sound?</p>
+      </div>
+      <div class="card">
+        <div class="stack">
+          <button class="btn-primary big-btn" id="volumeHeardBtn" type="button">
+            Yes — I heard it
+          </button>
+          <button class="btn-ghost big-btn" id="volumeReplayBtn" type="button">
+            Play it again
+          </button>
+          <button class="btn-ghost big-btn" id="volumeNoBtn" type="button">
+            No — turn up volume
+          </button>
+          <p class="muted volume-gate__hint">Set your phone volume to 100% and turn off silent/mute.</p>
+          <p class="error" id="volumeGateError" style="display:none"></p>
+        </div>
+      </div>
+    `;
+    return;
+  }
+
   main.innerHTML = `
     <div class="hero">
       <h1>THE <span class="pct">1%</span> CLUB</h1>
       <p class="volume-gate__copy">
-        ${
-          returning
-            ? 'Tap below to re-enable phone sound for this visit.'
-            : 'Make sure your phone or device volume is at <strong>100%</strong> before playing.'
-        }
+        Can you hear this?
+      </p>
+      <p class="muted volume-gate__hint" style="margin-top:0.75rem">
+        Turn your phone volume to <strong>100%</strong>, then tap play.
       </p>
     </div>
     <div class="card">
       <div class="stack">
-        <button class="btn-primary big-btn" id="volumeOkBtn" type="button">
-          ${returning ? 'Enable sound — play test' : 'Volume is at 100% — play test sound'}
+        <button class="btn-primary big-btn" id="volumePlayBtn" type="button">
+          Play sound
         </button>
-        <p class="muted volume-gate__hint">You should hear the blue-light sound. Tap QA anytime to retest.</p>
+        <p class="muted volume-gate__hint">You will confirm after it plays.</p>
         <p class="error" id="volumeGateError" style="display:none"></p>
       </div>
     </div>
   `;
+}
+
+function showVolumeGateError(message) {
+  const errEl = document.getElementById('volumeGateError');
+  if (!errEl) return;
+  errEl.style.display = message ? 'block' : 'none';
+  errEl.textContent = message || '';
+}
+
+async function playVolumeTest(button) {
+  showVolumeGateError('');
+  if (button) {
+    button.disabled = true;
+    button.textContent = 'Playing…';
+  }
+  try {
+    const ok = await playTestTone();
+    if (!ok && !isAudioActivated()) {
+      throw new Error('Browser blocked sound — check silent/mute, then try again');
+    }
+    volumeGateStep = 'confirm';
+    render();
+  } catch (err) {
+    if (button) {
+      button.disabled = false;
+      button.textContent = button.id === 'volumeReplayBtn' ? 'Play it again' : 'Play sound';
+    }
+    showVolumeGateError(err.message || 'Could not play sound');
+  }
 }
 
 function renderJoin() {
@@ -383,7 +437,7 @@ function renderWatch() {
 }
 
 function render() {
-  // New page loads must unlock audio again (iOS); session flag alone is not enough.
+  // Must hear + confirm each visit (also unlocks iOS audio).
   if (!volumeReady || !isAudioActivated()) {
     renderVolumeGate();
     return;
@@ -479,30 +533,29 @@ main.addEventListener('click', async (e) => {
   if (!(t instanceof HTMLElement)) return;
 
   try {
-    if (t.id === 'volumeOkBtn') {
-      const errEl = document.getElementById('volumeGateError');
-      if (errEl) {
-        errEl.style.display = 'none';
-        errEl.textContent = '';
-      }
-      t.disabled = true;
-      t.textContent = 'Playing test…';
+    if (t.id === 'volumePlayBtn' || t.id === 'volumeReplayBtn') {
+      await playVolumeTest(t);
+      return;
+    }
+    if (t.id === 'volumeHeardBtn') {
+      volumeReady = true;
+      volumeGateStep = 'ask';
       try {
-        const ok = await playTestTone();
-        if (!ok && !isAudioActivated()) {
-          throw new Error('Browser blocked sound — tap again, or check silent/mute switch');
-        }
-        volumeReady = true;
         sessionStorage.setItem(VOLUME_KEY, '1');
-        render();
-      } catch (err) {
-        t.disabled = false;
-        t.textContent = 'Volume is at 100% — play test sound';
-        if (errEl) {
-          errEl.style.display = 'block';
-          errEl.textContent = err.message || 'Could not play sound';
-        }
+      } catch {
+        // ignore
       }
+      render();
+      return;
+    }
+    if (t.id === 'volumeNoBtn') {
+      volumeGateStep = 'ask';
+      volumeReady = false;
+      render();
+      // After re-render, show tip on the ask screen
+      queueMicrotask(() => {
+        showVolumeGateError('Turn volume to 100%, turn off silent mode, then play again.');
+      });
       return;
     }
     if (t.id === 'joinBtn') {
