@@ -472,7 +472,7 @@ function render() {
       return;
     }
     const pending = elim.stage === 'pending';
-    const sting = elim.stage === 'sting';
+    const sting = elim.stage === 'sting' || elim.stage === 'clean_sting';
     main.innerHTML = `
       <div class="hero">
         <div class="status-pill">${
@@ -522,6 +522,22 @@ function render() {
       break;
     case 'solo_offer':
       renderSolo();
+      break;
+    case 'left_count':
+      main.innerHTML = `
+        <div class="hero">
+          <div class="status-pill">STILL IN</div>
+          <h1 style="margin-top:1rem">${state.players.filter((x) => x.status === 'active').length} left</h1>
+          <p class="muted">Watch the TV</p>
+        </div>`;
+      break;
+    case 'prize_pot':
+      main.innerHTML = `
+        <div class="hero">
+          <div class="status-pill">PRIZE POT</div>
+          <h1 style="margin-top:1rem">${money(state.jackpot)}</h1>
+          <p class="muted">Watch the TV</p>
+        </div>`;
       break;
     case 'reveal':
     case 'finale':
@@ -634,7 +650,10 @@ main.addEventListener('keydown', (e) => {
 
 function syncEliminationUi(p) {
   const elim = state?.elimination;
-  const searching = state?.phase === 'eliminating' && elim?.stage === 'sting' && p?.status === 'active';
+  const searching =
+    state?.phase === 'eliminating' &&
+    (elim?.stage === 'sting' || elim?.stage === 'clean_sting') &&
+    p?.status === 'active';
   const amLit = !!(
     p &&
     (p.status === 'out' || elim?.revealedIds?.includes(p.id) || elim?.currentId === p.id)
@@ -656,10 +675,15 @@ function handlePlayerSoundCue(cue) {
   lastPlaySoundAt = cue.at;
   noteSoundCue(cue);
 
-  if (cue.name === 'eliminating') {
-    const times = cue.times || state?.elimination?.stingTimes || 1;
-    // Full blast on phones — same clip as the audio test
-    playSoundTimes('eliminating', times, { volume: 1 }).catch(() => {});
+  // TV-only — phones never play eliminating.mp3
+  if (cue.audience === 'display' || cue.name === 'eliminating') {
+    return;
+  }
+
+  // Phone-only thump before each non-last wrong blue light
+  if (cue.name === 'thump') {
+    const times = cue.times || 1;
+    playSoundTimes('thump', times, { volume: 1 }).catch(() => {});
     return;
   }
 

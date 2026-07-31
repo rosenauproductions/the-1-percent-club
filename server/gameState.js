@@ -1,4 +1,4 @@
-/** @typedef {'lobby'|'intro'|'question'|'answering'|'eliminating'|'reveal'|'cashout_offer'|'final_choice'|'solo_offer'|'finale'|'game_end'} Phase */
+/** @typedef {'lobby'|'intro'|'question'|'answering'|'eliminating'|'left_count'|'prize_pot'|'reveal'|'cashout_offer'|'final_choice'|'solo_offer'|'finale'|'game_end'} Phase */
 /** @typedef {'active'|'out'|'cashed'|'took10k'|'winner'} PlayerStatus */
 
 export const STAKE = 1000;
@@ -57,7 +57,13 @@ function defaultSetup() {
 
 /** Estimated length of one eliminating.mp3 play (server fallback timer). */
 export const ELIM_STING_MS = 900;
+/** Estimated length of thump.mp3 (play-only sting). */
+export const THUMP_MS = 700;
 export const ELIM_REVEAL_GAP_MS = 1200;
+/** How long to hold the "X left" board before prize pot */
+export const LEFT_COUNT_MS = 3200;
+/** How long to hold the prize-pot spectacle before the answer reveal */
+export const PRIZE_POT_MS = 4500;
 
 export function createInitialState() {
   return {
@@ -380,8 +386,11 @@ export function beginQuestion(state, questionIndex) {
     _awaitingQuestionIndex: undefined,
   };
 
-  // Host talk / banter bed — question + answer music wait for Start.
-  return actionMeta(cue(next, 'interlude'), 'begin_question', { questionIndex });
+  // Intro bed only while waiting to start the first question; later holds are silent.
+  if (questionIndex === 0) {
+    return actionMeta(cue(next, 'intro'), 'begin_question', { questionIndex });
+  }
+  return actionMeta({ ...next, soundCue: null }, 'begin_question', { questionIndex });
 }
 
 export function startAnswering(state) {
@@ -636,7 +645,8 @@ function computePendingAfterReveal(state, wrongIds) {
 
 /**
  * Host pressed "Show who is right and wrong".
- * Clean round → reveal + correct sting. Otherwise start eliminating.mp3 → blue light per wrong player.
+ * Clean round → TV eliminating.mp3 × 1–3, then reveal.
+ * Wrongs → phone thump per contestant until the last; last gets TV eliminating × 1–3, then blue light.
  */
 export function showResults(state) {
   if (state.phase !== 'eliminating' || state.elimination?.stage !== 'pending') {
@@ -645,20 +655,24 @@ export function showResults(state) {
 
   const wrongIds = state.elimination.wrongIds || [];
   if (wrongIds.length === 0) {
+    const times = 1 + Math.floor(Math.random() * 3);
     return actionMeta(
       cue(
         {
           ...state,
-          phase: 'reveal',
           elimination: {
             ...state.elimination,
-            stage: 'done',
+            stage: 'clean_sting',
+            stingTimes: times,
+            stingTargetId: null,
             currentId: null,
           },
         },
-        'correct',
+        'eliminating',
+        { times, audience: 'display' },
       ),
-      'show_results',
+      'show_results_clean_sting',
+      { times },
     );
   }
 
@@ -670,18 +684,66 @@ export function showEliminated(state) {
   return showResults(state);
 }
 
-/** Play eliminating.mp3 1–3 times, then blue-light the next wrong player. */
+/** Clean-round TV sting finished → how many left. */
+export function finishCleanSting(state) {
+  if (state.phase !== 'eliminating' || state.elimination?.stage !== 'clean_sting') {
+    return state;
+  }
+  return enterLeftCount({
+    ...state,
+    elimination: {
+      ...state.elimination,
+      stage: 'done',
+      currentId: null,
+      stingTimes: null,
+    },
+  });
+}
+
+/** After outs — big "X left" board. */
+export function enterLeftCount(state) {
+  const left = activePlayers(state).length;
+  return actionMeta(
+    {
+      ...state,
+      phase: 'left_count',
+      soundCue: null,
+    },
+    'left_count',
+    { left },
+  );
+}
+
+/** Prize pot / jackpot spectacle (show money). */
+export function enterPrizePot(state) {
+  return actionMeta(cue({ ...state, phase: 'prize_pot' }, 'jackpot'), 'prize_pot');
+}
+
+/** Correct-answer reveal after pot. */
+export function enterAnswerReveal(state) {
+  return actionMeta(cue({ ...state, phase: 'reveal' }, 'correct'), 'reveal_answer');
+}
+
+/**
+ * Sting before the next blue light.
+ * Non-last wrong → thump on phones. Last wrong → eliminating × 1–3 on TV.
+ */
 export function startEliminationSting(state) {
   if (state.phase !== 'eliminating') throw new Error('Not eliminating');
   const elim = state.elimination;
   if (!elim) throw new Error('No elimination data');
 
-  const nextId = elim.wrongIds.find((id) => !elim.revealedIds.includes(id));
+  const remaining = elim.wrongIds.filter((id) => !elim.revealedIds.includes(id));
+  const nextId = remaining[0];
   if (!nextId) {
     return finalizeElimination(state);
   }
 
-  const times = 1 + Math.floor(Math.random() * 3); // 1–3
+  const isLast = remaining.length === 1;
+  const times = isLast ? 1 + Math.floor(Math.random() * 3) : 1;
+  const soundName = isLast ? 'eliminating' : 'thump';
+  const audience = isLast ? 'display' : 'play';
+
   return actionMeta(
     cue(
       {
@@ -691,14 +753,15 @@ export function startEliminationSting(state) {
           stage: 'sting',
           stingTargetId: nextId,
           stingTimes: times,
+          stingSound: soundName,
           currentId: null,
         },
       },
-      'eliminating',
-      { times },
+      soundName,
+      { times, audience },
     ),
     'elim_sting',
-    { playerId: nextId, times },
+    { playerId: nextId, times, soundName, audience },
   );
 }
 
@@ -731,6 +794,7 @@ export function finishEliminationSting(state) {
           currentId: nextId,
           stingTargetId: null,
           stingTimes: null,
+          stingSound: null,
         },
       },
       'eliminate',
@@ -761,29 +825,34 @@ export function revealNextEliminated(state) {
 
 export function finalizeElimination(state) {
   const elim = state.elimination;
-  let next = {
+  return enterLeftCount({
     ...state,
-    phase: 'reveal',
     elimination: {
       ...elim,
       stage: 'done',
       currentId: null,
       stingTargetId: null,
       stingTimes: null,
+      stingSound: null,
     },
-    soundCue: null,
-  };
-
-  return actionMeta(next, 'elim_done');
+  });
 }
 
 export function advanceAfterReveal(state) {
+  if (state.phase === 'left_count') {
+    return enterPrizePot(state);
+  }
+  if (state.phase === 'prize_pot') {
+    return enterAnswerReveal(state);
+  }
   if (state.phase !== 'reveal' && state.phase !== 'eliminating') {
     throw new Error('Not in reveal');
   }
   // If somehow still eliminating, finish first
   if (state.phase === 'eliminating') {
     state = finalizeElimination(state);
+    // Still on left_count — don't skip the boards
+    if (state.phase === 'left_count') return state;
   }
   const pending = state.pendingAfterReveal;
 

@@ -21,9 +21,13 @@ import {
   endAnsweringWithForces,
   showResults,
   finishEliminationSting,
+  finishCleanSting,
   continueElimination,
   advanceAfterReveal,
   ELIM_STING_MS,
+  THUMP_MS,
+  LEFT_COUNT_MS,
+  PRIZE_POT_MS,
   hostOverride,
   cashoutDecide,
   resolveCashout,
@@ -84,13 +88,27 @@ function scheduleAnswerTimer() {
   }, delay + 50);
 }
 
+function stingFallbackDelay() {
+  const elim = state.elimination;
+  const times = elim?.stingTimes || 1;
+  const sound = elim?.stingSound || state.soundCue?.name;
+  if (sound === 'thump') return times * THUMP_MS + 350;
+  return times * ELIM_STING_MS + 400;
+}
+
 function scheduleElimStingFallback() {
   if (elimRevealTimer) clearTimeout(elimRevealTimer);
-  const times = state.elimination?.stingTimes || 1;
-  const delay = times * ELIM_STING_MS + 400;
+  const delay = stingFallbackDelay();
   elimRevealTimer = setTimeout(() => {
     try {
-      if (state.phase !== 'eliminating' || state.elimination?.stage !== 'sting') return;
+      if (state.phase !== 'eliminating') return;
+      if (state.elimination?.stage === 'clean_sting') {
+        state = finishCleanSting(state);
+        broadcast();
+        schedulePostElimBoards();
+        return;
+      }
+      if (state.elimination?.stage !== 'sting') return;
       state = finishEliminationSting(state);
       broadcast();
       scheduleAfterElimLight();
@@ -109,11 +127,40 @@ function scheduleAfterElimLight(delay = ELIM_REVEAL_GAP_MS) {
       broadcast();
       if (state.phase === 'eliminating' && state.elimination?.stage === 'sting') {
         scheduleElimStingFallback();
+      } else {
+        schedulePostElimBoards();
       }
     } catch {
       // ignore
     }
   }, delay);
+}
+
+/** Auto: left count → prize pot → answer reveal */
+function schedulePostElimBoards() {
+  if (elimRevealTimer) clearTimeout(elimRevealTimer);
+  if (state.phase === 'left_count') {
+    elimRevealTimer = setTimeout(() => {
+      try {
+        if (state.phase !== 'left_count') return;
+        state = advanceAfterReveal(state);
+        broadcast();
+        schedulePostElimBoards();
+      } catch {
+        // ignore
+      }
+    }, LEFT_COUNT_MS);
+  } else if (state.phase === 'prize_pot') {
+    elimRevealTimer = setTimeout(() => {
+      try {
+        if (state.phase !== 'prize_pot') return;
+        state = advanceAfterReveal(state);
+        broadcast();
+      } catch {
+        // ignore
+      }
+    }, PRIZE_POT_MS);
+  }
 }
 
 function clientView(ws) {
@@ -133,7 +180,9 @@ function scheduleSoundCueClear() {
       ? 2500
       : cue.name === 'eliminating'
         ? Math.max(2500, (cue.times || 1) * ELIM_STING_MS + 800)
-        : 1200;
+        : cue.name === 'thump'
+          ? Math.max(1500, (cue.times || 1) * THUMP_MS + 600)
+          : 1200;
   soundCueClearTimer = setTimeout(() => {
     if (state.soundCue?.at === cue.at) {
       state = clearSoundCue(state);
@@ -281,14 +330,21 @@ async function handleAction(action, payload = {}, meta = {}) {
       requireHost(role);
       clearElimTimers();
       state = showResults(state);
-      if (state.phase === 'eliminating' && state.elimination?.stage === 'sting') {
+      if (
+        state.phase === 'eliminating' &&
+        (state.elimination?.stage === 'sting' || state.elimination?.stage === 'clean_sting')
+      ) {
         scheduleElimStingFallback();
       }
       break;
 
     case 'elim_sting_done':
-      // Display finished playing eliminating.mp3 × N — light that contestant
-      if (state.phase === 'eliminating' && state.elimination?.stage === 'sting') {
+      // TV finished eliminating sting (clean round or last wrong) — advance
+      if (state.phase === 'eliminating' && state.elimination?.stage === 'clean_sting') {
+        clearElimTimers();
+        state = finishCleanSting(state);
+        schedulePostElimBoards();
+      } else if (state.phase === 'eliminating' && state.elimination?.stage === 'sting') {
         clearElimTimers();
         state = finishEliminationSting(state);
         scheduleAfterElimLight();
@@ -305,6 +361,7 @@ async function handleAction(action, payload = {}, meta = {}) {
       clearElimTimers();
       state = advanceAfterReveal(state);
       if (state.phase === 'answering') scheduleAnswerTimer();
+      schedulePostElimBoards();
       break;
 
     case 'cashout_decide':

@@ -305,6 +305,22 @@ function render() {
     case 'answering':
       renderQuestion();
       break;
+    case 'left_count':
+      main.innerHTML = `
+        <div class="card">
+          <h2>${activePlayers().length} left</h2>
+          <p class="muted">TV is showing how many contestants remain.</p>
+          <button class="btn-primary big-btn" style="margin-top:0.85rem" data-act="advance">Show prize pot</button>
+        </div>`;
+      break;
+    case 'prize_pot':
+      main.innerHTML = `
+        <div class="card">
+          <h2>Prize pot · ${money(state.jackpot)}</h2>
+          <p class="muted">TV jackpot board is up.</p>
+          <button class="btn-primary big-btn" style="margin-top:0.85rem" data-act="advance">Show correct answer</button>
+        </div>`;
+      break;
     case 'reveal':
       renderReveal();
       break;
@@ -328,14 +344,20 @@ function render() {
             <button class="btn-primary big-btn" style="margin-top:0.85rem" data-act="show_results">Show who is right and wrong</button>
           </div>`;
       } else {
-        const sting = state.elimination?.stage === 'sting';
+        const stage = state.elimination?.stage;
+        const sting = stage === 'sting' || stage === 'clean_sting';
+        const sound = state.elimination?.stingSound || state.soundCue?.name || '—';
         main.innerHTML = `
           <div class="card">
             <h2>Elimination</h2>
             <p class="muted">${
-              sting
-                ? `Scanning… (${state.elimination?.stingTimes || 1}× eliminating.mp3)`
-                : `Lighting out ${state.elimination?.revealedCount || 0} / ${state.elimination?.wrongIds?.length || 0}`
+              stage === 'clean_sting'
+                ? `Clean round sting — TV ${state.elimination?.stingTimes || 1}× eliminating.mp3`
+                : sting
+                  ? `Scanning… ${sound}${
+                      sound === 'eliminating' ? ` × ${state.elimination?.stingTimes || 1} (TV)` : ' (phones)'
+                    }`
+                  : `Lighting out ${state.elimination?.revealedCount || 0} / ${state.elimination?.wrongIds?.length || 0}`
             }</p>
             <p class="muted">Wait for the sequence to finish, then continue.</p>
           </div>`;

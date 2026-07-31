@@ -5,6 +5,7 @@ const DEFAULT_SOUNDS = {
   lock: 'lock.mp3',
   correct: 'correct.mp3',
   eliminating: 'eliminating.mp3',
+  thump: 'thump.mp3',
   eliminate: 'eliminate.mp3',
   youre_out: 'youre-out.mp3',
   pass: 'pass.mp3',
@@ -246,10 +247,10 @@ export async function playSoundTimes(name, times, options = {}) {
   }
 }
 
-/** Audible confirmation for volume-gate / QA test (eliminating.mp3). */
+/** Audible confirmation for volume-gate / QA test (phone-only thump.mp3). */
 export async function playTestTone() {
   await activateAudio();
   if (!audioActivated) return false;
-  await playSoundUntilEnded('eliminating', { volume: 1 });
+  await playSoundUntilEnded('thump', { volume: 1 });
   return true;
 }

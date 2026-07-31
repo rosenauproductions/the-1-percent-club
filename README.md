@@ -66,13 +66,14 @@ Placeholder tones live in `public/sounds/`. Drop your own files with the same na
 
 | File | Cue |
 |------|-----|
-| `intro.mp3` | Game start / intro (plays once at 50% on TV) |
-| `interlude.mp3` | Between questions — host talk bed (loops until Start) |
+| `intro.mp3` | Game start + wait before **first** question only (once, 50% on TV) |
+| `interlude.mp3` | Unused bed (kept for optional custom wiring) |
 | `timer.mp3` | Host starts the question / answer window (plays through locks) |
 | `lock.mp3` | Unused (kept for optional custom wiring) |
-| `correct.mp3` | Clean round |
-| `eliminating.mp3` | Before each blue light (plays 1–3× randomly); also `/play` audio test |
-| `eliminate.mp3` | Each wrong player lit (after eliminating sting) |
+| `correct.mp3` | After clean-round TV sting |
+| `thump.mp3` | `/play` only — sting before each non-last wrong blue light; audio test |
+| `eliminating.mp3` | TV only — clean round or **last** wrong (plays 1–3× randomly) |
+| `eliminate.mp3` | Each wrong player lit (after sting) |
 | `youre-out.mp3` | Personal out sting (eliminated phone) |
 | `pass.mp3` | Pass / cash-out moments |
 | `jackpot.mp3` | Jackpot sting |

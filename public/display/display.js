@@ -33,6 +33,9 @@ function seatClass(p) {
   if (p.status === 'cashed' || p.status === 'took10k') return p.status;
   const elim = state?.elimination;
   if (p.status === 'out' || elim?.revealedIds?.includes(p.id)) return 'out';
+  if (elim?.stage === 'clean_sting' && p.status === 'active') {
+    return 'searching';
+  }
   if (
     (elim?.stage === 'sting' || elim?.stage === 'lighting') &&
     p.status === 'active' &&
@@ -254,10 +257,12 @@ function syncQuestionImageLayout() {
 function renderEliminating() {
   const elim = state.elimination || {};
   const pending = elim.stage === 'pending';
-  const sting = elim.stage === 'sting';
-  const count = elim.revealedCount || 0;
-  const total = elim.wrongIds?.length || 0;
+  const sting = elim.stage === 'sting' || elim.stage === 'clean_sting';
+  const outCount = elim.revealedCount || 0;
+  const leftCount = state.players.filter((p) => p.status === 'active').length;
   const current = state.players.find((p) => p.id === elim.currentId);
+  // Show running tally once anyone has been revealed (and keep it through later stings)
+  const showTally = !pending && outCount > 0;
 
   main.innerHTML = `
     <div class="elim-layout">
@@ -271,13 +276,18 @@ function renderEliminating() {
               : "YOU'RE OUT"
         }</h2>
         ${
-          pending
-            ? ''
-            : `<div class="elim-count">
-          <span class="elim-count__label">WRONG</span>
-          <span class="elim-count__value" id="elimWrongCount">${count}</span>
-          <span class="elim-count__of">/ ${total}</span>
+          showTally
+            ? `<div class="elim-tally">
+          <div class="elim-tally__row elim-tally__row--out">
+            <span class="elim-tally__value" id="elimOutCount">${outCount}</span>
+            <span class="elim-tally__label">out</span>
+          </div>
+          <div class="elim-tally__row elim-tally__row--left">
+            <span class="elim-tally__value" id="elimLeftCount">${leftCount}</span>
+            <span class="elim-tally__label">left</span>
+          </div>
         </div>`
+            : ''
         }
         ${
           current && !pending && !sting
@@ -292,9 +302,43 @@ function renderEliminating() {
   `;
 }
 
+function renderLeftCount() {
+  const left = state.players.filter((p) => p.status === 'active').length;
+  main.innerHTML = `
+    <div class="left-count-board">
+      <div class="left-count-board__value">${left}</div>
+      <div class="left-count-board__label">left</div>
+      <p class="left-count-board__sub">contestants still in the game</p>
+    </div>
+  `;
+}
+
+function renderPrizePot() {
+  const amount = money(state.jackpot);
+  const signs = Array.from({ length: 36 }, (_, i) => {
+    const left = 4 + ((i * 17) % 92);
+    const delay = ((i * 0.11) % 2.4).toFixed(2);
+    const dur = (2.4 + (i % 5) * 0.35).toFixed(2);
+    const size = 1.1 + (i % 6) * 0.35;
+    return `<span class="prize-pot__sign" style="left:${left}%;animation-delay:${delay}s;animation-duration:${dur}s;font-size:${size}em">$</span>`;
+  }).join('');
+
+  main.innerHTML = `
+    <div class="prize-pot">
+      <div class="prize-pot__glow"></div>
+      <div class="prize-pot__ring"></div>
+      <div class="prize-pot__signs" aria-hidden="true">${signs}</div>
+      <div class="prize-pot__amount">${escapeHtml(amount)}</div>
+      <div class="prize-pot__label">PRIZE POT</div>
+    </div>
+  `;
+}
+
 function renderReveal() {
   const r = state.reveal;
   const accepted = (r?.accepted || []).slice(0, 3).join(' / ');
+  const leftCount = state.players.filter((p) => p.status === 'active').length;
+  const outCount = r?.eliminated ?? state.players.filter((p) => p.status === 'out').length;
   main.innerHTML = `
     <div class="reveal-layout">
       <div class="pct-badge" style="align-self:center">${r?.percent ?? '?'}%</div>
@@ -308,8 +352,8 @@ function renderReveal() {
         <div class="answer-banner__value">${escapeHtml(accepted)}</div>
       </div>
       <div class="reveal-stats">
-        <div class="in">${r?.survived ?? 0} SAFE</div>
-        <div class="out">${r?.eliminated ?? 0} OUT</div>
+        <div class="out">${outCount} out</div>
+        <div class="in">${leftCount} left</div>
       </div>
       <div class="side-grid" style="flex:1;min-height:0">${renderSeatGrid(state.players)}</div>
     </div>
@@ -383,6 +427,8 @@ function render() {
   if (!state) return;
   jackpotEl.textContent = money(state.jackpot);
   aliveEl.textContent = String(state.players.filter((p) => p.status === 'active').length);
+  document.body.classList.toggle('prize-pot-mode', state.phase === 'prize_pot');
+  document.body.classList.toggle('left-count-mode', state.phase === 'left_count');
 
   switch (state.phase) {
     case 'lobby':
@@ -397,6 +443,12 @@ function render() {
       break;
     case 'eliminating':
       renderEliminating();
+      break;
+    case 'left_count':
+      renderLeftCount();
+      break;
+    case 'prize_pot':
+      renderPrizePot();
       break;
     case 'reveal':
       renderReveal();
@@ -424,8 +476,13 @@ function render() {
 async function handleSoundCue(cue) {
   if (!cue || cue.at === lastSoundAt) return;
   lastSoundAt = cue.at;
-  // Only bed / phase music stops the previous track. Short SFX (pass, eliminate, …)
-  // must not cut the question timer bed mid-round.
+
+  // Phone-only cues — TV stays silent (server timer advances the sting)
+  if (cue.audience === 'play' || cue.name === 'thump') {
+    return;
+  }
+
+  // Only bed / phase music stops the previous track.
   const looping = cue.name === 'interlude';
   const replacesMusic =
     looping ||
@@ -437,20 +494,24 @@ async function handleSoundCue(cue) {
     cue.name === 'win' ||
     cue.name === 'jackpot';
   if (replacesMusic) stopAllMusic();
+  // jackpot sting at full TV presence for the pot board
+  if (cue.name === 'jackpot') {
+    await playSound('jackpot', { volume: 0.85 });
+    return;
+  }
 
-  // eliminating.mp3 × 1–3, then tell server to blue-light that contestant
+  // TV-only: eliminating.mp3 × 1–3 (clean round or last wrong), then advance
   if (cue.name === 'eliminating') {
     const times = cue.times || state?.elimination?.stingTimes || 1;
     await playSoundTimes('eliminating', times, { volume: 0.5 });
     try {
       await sendAction('elim_sting_done');
     } catch {
-      // server fallback timer will light them
+      // server fallback timer will advance
     }
     return;
   }
 
-  // Intro + blue-light quieter on the room TV; phones play elim at full blast.
   const volume =
     cue.name === 'intro' || cue.name === 'eliminate' ? 0.5 : undefined;
   await playSound(cue.name, {
@@ -458,12 +519,11 @@ async function handleSoundCue(cue) {
     asMusic: looping || cue.name === 'intro',
     ...(volume != null ? { volume } : {}),
   });
-  // Delay clear so phones still receive eliminate cues (display used to clear instantly).
   if (cue.name !== 'eliminate') {
     try {
       await sendAction('clear_sound');
     } catch {
-      // ignore — server also TTL-clears cues
+      // ignore
     }
   }
 }
@@ -474,11 +534,15 @@ function onState(next) {
   hideBoot();
   setMasterVolume(next.setup?.masterVolume ?? 0.7);
   configureSounds(next.setup?.sounds);
-  // Stop question bed when the round ends (host still holds before Show eliminated)
+  // Stop question bed when the round ends
   if (
     prevPhase === 'answering' &&
     (next.phase === 'eliminating' || next.phase === 'reveal')
   ) {
+    stopAllMusic();
+  }
+  // Intro only before Q1 — later question holds stay silent
+  if (next.phase === 'question' && (next.questionIndex ?? 0) > 0) {
     stopAllMusic();
   }
   render();
