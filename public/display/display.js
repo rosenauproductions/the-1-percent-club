@@ -7,6 +7,8 @@ import {
   configureSounds,
   isAudioActivated,
   stopAllMusic,
+  playEliminatingUntilStopped,
+  stopPendingEliminating,
 } from '../shared/audio.js';
 import { installErrorHandlers, mountQaWidget, showBoot, hideBoot } from '../shared/boot.js';
 
@@ -507,6 +509,7 @@ async function handleSoundCue(cue) {
 
   // thump.mp3 — soft on TV (phones carry it); still advances the sting
   if (cue.name === 'thump') {
+    stopPendingEliminating();
     const times = cue.times || state?.elimination?.stingTimes || 1;
     await playSoundTimes('thump', times, { volume: 0.2 });
     try {
@@ -517,10 +520,15 @@ async function handleSoundCue(cue) {
     return;
   }
 
-  // eliminating.mp3 × 1–3 (clean round or last wrong; phones play too), then advance
+  // Pending hold — eliminating.mp3 in 1× or 3× bursts until host shows who is out
   if (cue.name === 'eliminating') {
-    const times = cue.times || state?.elimination?.stingTimes || 1;
-    await playSoundTimes('eliminating', times, { volume: 0.5 });
+    const vol = typeof cue.volume === 'number' ? cue.volume : 0.55;
+    const times = cue.times || state?.elimination?.pendingLoops || 1;
+    if (cue.loop) {
+      playEliminatingUntilStopped({ times, volume: vol }).catch(() => {});
+      return;
+    }
+    await playSoundTimes('eliminating', times, { volume: vol });
     try {
       await sendAction('elim_sting_done');
     } catch {
@@ -529,10 +537,17 @@ async function handleSoundCue(cue) {
     return;
   }
 
+  // After all wrongs shown — eliminate.mp3 once over the left-count board
+  if (cue.name === 'eliminate') {
+    stopPendingEliminating();
+    await playSound('eliminate', { volume: 0.65 });
+    return;
+  }
+
   const volume =
     typeof cue.volume === 'number'
       ? cue.volume
-      : cue.name === 'intro' || cue.name === 'eliminate'
+      : cue.name === 'intro'
         ? 0.5
         : undefined;
   await playSound(cue.name, {
@@ -541,7 +556,7 @@ async function handleSoundCue(cue) {
     ...(volume != null ? { volume } : {}),
   });
   // Don't clear looping intro — host is talking over it until Begin questions
-  if (cue.name !== 'eliminate' && !looping) {
+  if (!looping) {
     try {
       await sendAction('clear_sound');
     } catch {
@@ -556,12 +571,19 @@ function onState(next) {
   hideBoot();
   setMasterVolume(next.setup?.masterVolume ?? 0.7);
   configureSounds(next.setup?.sounds);
-  // Stop question bed when the round ends
+  // Stop question / eliminating beds on phase changes
   if (
     prevPhase === 'answering' &&
     (next.phase === 'eliminating' || next.phase === 'reveal')
   ) {
     stopAllMusic();
+  }
+  if (
+    prevPhase === 'eliminating' &&
+    (next.phase === 'left_count' || next.phase === 'prize_pot' || next.phase === 'reveal')
+  ) {
+    // thump / eliminate cues handle stop; clean round has no cue — stop here
+    if (!next.soundCue) stopPendingEliminating();
   }
   // Intro only before Q1 — later question holds stay silent
   if (next.phase === 'question' && (next.questionIndex ?? 0) > 0) {

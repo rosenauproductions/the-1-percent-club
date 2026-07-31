@@ -6,6 +6,8 @@ import {
   playTestTone,
   noteSoundCue,
   isAudioActivated,
+  playEliminatingUntilStopped,
+  stopPendingEliminating,
 } from '../shared/audio.js';
 
 installErrorHandlers('play');
@@ -688,7 +690,6 @@ function syncEliminationUi(p) {
 async function playOutSting() {
   playedOutSound = true;
   // Must already be unlocked from volume gate / QA — play() outside gesture fails on iOS otherwise
-  await playSound('eliminate', { volume: 1 });
   await playSound('youre_out', { volume: 1 });
 }
 
@@ -697,17 +698,23 @@ function handlePlayerSoundCue(cue) {
   lastPlaySoundAt = cue.at;
   noteSoundCue(cue);
 
-  // eliminating.mp3 on phones too (full blast) — clean round / last wrong
+  // Pending hold — eliminating in 1× or 3× bursts until host shows who is out
   if (cue.name === 'eliminating') {
-    const times = cue.times || state?.elimination?.stingTimes || 1;
-    playSoundTimes('eliminating', times, { volume: 1 }).catch(() => {});
+    const vol = typeof cue.volume === 'number' ? cue.volume : 1;
+    const times = cue.times || state?.elimination?.pendingLoops || 1;
+    if (cue.loop) {
+      playEliminatingUntilStopped({ times, volume: vol }).catch(() => {});
+      return;
+    }
+    playSoundTimes('eliminating', times, { volume: vol }).catch(() => {});
     return;
   }
 
-  // thump before each non-last wrong — phones carry it (TV soft at 20%)
+  // thump — phones carry it loud (gain ~300%); TV soft at 20%
   if (cue.name === 'thump') {
+    stopPendingEliminating();
     const times = cue.times || 1;
-    playSoundTimes('thump', times, { volume: 1 }).catch(() => {});
+    playSoundTimes('thump', times, { volume: 1, gain: 3 }).catch(() => {});
     return;
   }
 
@@ -715,11 +722,10 @@ function handlePlayerSoundCue(cue) {
     return;
   }
 
+  // After all wrongs shown — room eliminate sting (not per-player)
   if (cue.name === 'eliminate') {
-    const elim = state?.elimination;
-    if (elim?.currentId && elim.currentId === playerId) {
-      playOutSting().catch(() => {});
-    }
+    stopPendingEliminating();
+    playSound('eliminate', { volume: 1 }).catch(() => {});
   }
 }
 
@@ -737,8 +743,16 @@ function maybePlayOutSound(p) {
 }
 
 function onState(next) {
+  const prevPhase = state?.phase;
   state = next;
   hideBoot();
+  if (
+    prevPhase === 'eliminating' &&
+    (next.phase === 'left_count' || next.phase === 'prize_pot' || next.phase === 'reveal') &&
+    !next.soundCue
+  ) {
+    stopPendingEliminating();
+  }
   if (next.soundCue) noteSoundCue(next.soundCue);
   const p = me();
   syncEliminationUi(p);

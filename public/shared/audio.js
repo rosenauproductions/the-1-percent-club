@@ -182,9 +182,36 @@ async function beginPlayback(audio, targetVolume, { name, loop }) {
   return true;
 }
 
+/**
+ * Optional Web Audio gain boost (e.g. gain: 3 ≈ 300% for quiet mobile SFX).
+ * HTMLAudioElement.volume caps at 1; gain can go higher.
+ */
+function applyGainBoost(audio, gain) {
+  const g = Number(gain);
+  if (!Number.isFinite(g) || g <= 1) return;
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    if (!audioCtx) audioCtx = new AC();
+    if (audioCtx.state === 'suspended') {
+      audioCtx.resume().catch(() => {});
+    }
+    const source = audioCtx.createMediaElementSource(audio);
+    const gainNode = audioCtx.createGain();
+    gainNode.gain.value = Math.min(4, g);
+    source.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+    // Element volume stays at 1; GainNode provides the boost
+    audio.volume = 1;
+    audio.dataset.gainBoost = String(gainNode.gain.value);
+  } catch {
+    // Already wired or unsupported — keep element volume
+  }
+}
+
 export async function playSound(
   name,
-  { loop = false, volume = masterVolume, asMusic = loop } = {},
+  { loop = false, volume = masterVolume, asMusic = loop, gain = 1 } = {},
 ) {
   const src = soundSrc(name);
   if (!src) {
@@ -200,8 +227,9 @@ export async function playSound(
   audio.loop = loop;
 
   if (asMusic) stopAllMusic();
+  applyGainBoost(audio, gain);
 
-  const started = await beginPlayback(audio, targetVolume, { name, loop });
+  const started = await beginPlayback(audio, audio.volume, { name, loop });
   if (!started) return null;
 
   if (asMusic) musicTracks.add(audio);
@@ -214,7 +242,8 @@ export async function playSound(
     pendingSfx = null;
   }
 
-  lastPlayResult = `${name} ok @ ${Math.round(targetVolume * 100)}%`;
+  const boost = audio.dataset.gainBoost ? ` ×${audio.dataset.gainBoost}` : '';
+  lastPlayResult = `${name} ok @ ${Math.round(targetVolume * 100)}%${boost}`;
   notify();
   return audio;
 }
@@ -251,7 +280,29 @@ export async function playSoundTimes(name, times, options = {}) {
 export async function playTestTone() {
   await activateAudio();
   if (!audioActivated) return false;
-  await playSoundUntilEnded('thump', { volume: 1 });
+  await playSoundUntilEnded('thump', { volume: 1, gain: 3 });
   await playSoundUntilEnded('eliminating', { volume: 1 });
   return true;
+}
+
+/** Cancel token for pending eliminating bed (1× or 3× cycles until host shows). */
+let pendingElimToken = 0;
+
+export function stopPendingEliminating() {
+  pendingElimToken += 1;
+  stopAllMusic();
+}
+
+/**
+ * Loop eliminating.mp3 in bursts of `times` (1 or 3) until stopPendingEliminating().
+ */
+export async function playEliminatingUntilStopped(options = {}) {
+  const times = Math.max(1, Math.min(3, Number(options.times) || 1));
+  const volume = options.volume ?? 0.55;
+  const token = ++pendingElimToken;
+  stopAllMusic();
+  while (token === pendingElimToken) {
+    await playSoundTimes('eliminating', times, { volume });
+    if (token !== pendingElimToken) break;
+  }
 }

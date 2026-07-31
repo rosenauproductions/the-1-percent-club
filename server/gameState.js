@@ -627,25 +627,30 @@ export function endAnsweringWithForces(state) {
     wrongIds,
   );
 
-  // Always hold for host — "Show who is right and wrong" starts lighting / reveal.
+  // Hold for host — loop eliminating.mp3 until they show who is out.
+  const elimLoops = Math.random() < 0.5 ? 1 : 3;
   return actionMeta(
-    {
-      ...state,
-      phase: 'eliminating',
-      timerEndsAt: null,
-      players,
-      jackpot,
-      reveal,
-      pendingAfterReveal: pending,
-      soundCue: null,
-      elimination: {
-        stage: 'pending',
-        wrongIds,
-        revealedIds: [],
-        revealedCount: 0,
-        currentId: null,
+    cue(
+      {
+        ...state,
+        phase: 'eliminating',
+        timerEndsAt: null,
+        players,
+        jackpot,
+        reveal,
+        pendingAfterReveal: pending,
+        elimination: {
+          stage: 'pending',
+          wrongIds,
+          revealedIds: [],
+          revealedCount: 0,
+          currentId: null,
+          pendingLoops: elimLoops,
+        },
       },
-    },
+      'eliminating',
+      { loop: true, times: elimLoops, audience: 'all', volume: 0.55 },
+    ),
     'end_answering',
   );
 }
@@ -664,8 +669,8 @@ function computePendingAfterReveal(state, wrongIds) {
 
 /**
  * Host pressed "Show who is right and wrong".
- * Clean round → TV eliminating.mp3 × 1–3, then reveal.
- * Wrongs → thump per contestant until the last; last gets eliminating × 1–3, then blue light.
+ * Stops the pending eliminating bed. Clean → left-count boards.
+ * Wrongs → thump + blue light one at a time; eliminate.mp3 only after all are shown.
  */
 export function showResults(state) {
   if (state.phase !== 'eliminating' || state.elimination?.stage !== 'pending') {
@@ -674,25 +679,17 @@ export function showResults(state) {
 
   const wrongIds = state.elimination.wrongIds || [];
   if (wrongIds.length === 0) {
-    const times = 1 + Math.floor(Math.random() * 3);
-    return actionMeta(
-      cue(
-        {
-          ...state,
-          elimination: {
-            ...state.elimination,
-            stage: 'clean_sting',
-            stingTimes: times,
-            stingTargetId: null,
-            currentId: null,
-          },
-        },
-        'eliminating',
-        { times, audience: 'all' },
-      ),
-      'show_results_clean_sting',
-      { times },
-    );
+    return enterLeftCount({
+      ...state,
+      elimination: {
+        ...state.elimination,
+        stage: 'done',
+        currentId: null,
+        stingTargetId: null,
+        stingTimes: null,
+        stingSound: null,
+      },
+    });
   }
 
   return startEliminationSting(state);
@@ -744,8 +741,7 @@ export function enterAnswerReveal(state) {
 }
 
 /**
- * Sting before the next blue light.
- * Non-last wrong → thump (phones loud, TV soft). Last wrong → eliminating × 1–3.
+ * Sting before the next blue light — thump for every wrong (phones loud, TV soft).
  */
 export function startEliminationSting(state) {
   if (state.phase !== 'eliminating') throw new Error('Not eliminating');
@@ -758,10 +754,8 @@ export function startEliminationSting(state) {
     return finalizeElimination(state);
   }
 
-  const isLast = remaining.length === 1;
-  const times = isLast ? 1 + Math.floor(Math.random() * 3) : 1;
-  const soundName = isLast ? 'eliminating' : 'thump';
-  // both clients hear; play.js at 100%, display at 20% for thump
+  const times = 1;
+  const soundName = 'thump';
   const audience = 'all';
 
   return actionMeta(
@@ -785,7 +779,7 @@ export function startEliminationSting(state) {
   );
 }
 
-/** Sting finished — light the targeted wrong player (eliminate.mp3). */
+/** Sting finished — light the targeted wrong player (no eliminate.mp3 yet). */
 export function finishEliminationSting(state) {
   if (state.phase !== 'eliminating' || state.elimination?.stage !== 'sting') {
     return state;
@@ -802,23 +796,21 @@ export function finishEliminationSting(state) {
   );
 
   return actionMeta(
-    cue(
-      {
-        ...state,
-        players,
-        elimination: {
-          ...elim,
-          stage: 'lighting',
-          revealedIds,
-          revealedCount: revealedIds.length,
-          currentId: nextId,
-          stingTargetId: null,
-          stingTimes: null,
-          stingSound: null,
-        },
+    {
+      ...state,
+      players,
+      soundCue: null,
+      elimination: {
+        ...elim,
+        stage: 'lighting',
+        revealedIds,
+        revealedCount: revealedIds.length,
+        currentId: nextId,
+        stingTargetId: null,
+        stingTimes: null,
+        stingSound: null,
       },
-      'eliminate',
-    ),
+    },
     'elim_light',
     { playerId: nextId },
   );
@@ -845,7 +837,7 @@ export function revealNextEliminated(state) {
 
 export function finalizeElimination(state) {
   const elim = state.elimination;
-  return enterLeftCount({
+  const next = {
     ...state,
     elimination: {
       ...elim,
@@ -855,7 +847,14 @@ export function finalizeElimination(state) {
       stingTimes: null,
       stingSound: null,
     },
-  });
+  };
+  const left = activePlayers(next).length;
+  // eliminate.mp3 only after every wrong for this round has been shown
+  return actionMeta(
+    cue({ ...next, phase: 'left_count' }, 'eliminate', { audience: 'all' }),
+    'left_count',
+    { left },
+  );
 }
 
 export function advanceAfterReveal(state) {

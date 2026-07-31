@@ -333,7 +333,7 @@ function render() {
         main.innerHTML = `
           <div class="card">
             <h2>Round over</h2>
-            <p class="muted">TV is holding — you see results first.</p>
+            <p class="muted">TV/phones looping eliminating.mp3 (${state.elimination?.pendingLoops || 1}× bursts) until you show who is out.</p>
             <ul class="answer-list" style="margin-top:0.75rem">
               ${(r?.results || [])
                 .map(
@@ -349,22 +349,13 @@ function render() {
       } else {
         const stage = state.elimination?.stage;
         const sting = stage === 'sting' || stage === 'clean_sting';
-        const sound = state.elimination?.stingSound || state.soundCue?.name || '—';
         main.innerHTML = `
           <div class="card">
             <h2>Elimination</h2>
             <p class="muted">${
-              stage === 'clean_sting'
-                ? `Clean round sting — TV ${state.elimination?.stingTimes || 1}× eliminating.mp3`
-                : sting
-                  ? `Scanning… ${sound}${
-                      sound === 'eliminating'
-                        ? ` × ${state.elimination?.stingTimes || 1}`
-                        : sound === 'thump'
-                          ? ' (phones; TV soft)'
-                          : ''
-                    }`
-                  : `Lighting out ${state.elimination?.revealedCount || 0} / ${state.elimination?.wrongIds?.length || 0}`
+              sting
+                ? `Scanning… thump (phones loud; TV soft)`
+                : `Lighting out ${state.elimination?.revealedCount || 0} / ${state.elimination?.wrongIds?.length || 0}`
             }</p>
             <p class="muted">Wait for the sequence to finish, then continue.</p>
           </div>`;
