@@ -184,26 +184,62 @@ function renderReveal() {
     <div class="card">
       <h2>Reveal · ${r?.percent}%</h2>
       <p class="muted">${r?.survived ?? 0} safe · ${r?.eliminated ?? 0} out · Next: ${escapeHtml(state.pendingAfterReveal || '')}</p>
-      <ul class="answer-list" style="margin-top:0.75rem">
-        ${(r?.results || [])
-          .map(
-            (row) => `<li>
-              <div class="name ${row.correct ? 'ok' : 'bad'}">${escapeHtml(row.name)} ${row.correct ? '✓' : '✗'}</div>
-              <div class="text">${escapeHtml(row.text)}</div>
-              ${
-                row.usedPass
-                  ? ''
-                  : `<div class="row" style="margin-top:0.4rem">
-                      <button class="btn-ghost" data-override="${row.playerId}" data-correct="1">Force ✓</button>
-                      <button class="btn-ghost" data-override="${row.playerId}" data-correct="0">Force ✗</button>
-                    </div>`
-              }
-            </li>`,
-          )
-          .join('')}
-      </ul>
+      ${renderRoastLists()}
       <button class="btn-primary big-btn" style="margin-top:0.85rem" data-act="advance">Continue</button>
     </div>
+  `;
+}
+
+/** Host roast sheet — wrong answers first and loud. */
+function renderRoastLists() {
+  const r = state.reveal;
+  const results = r?.results || [];
+  const wrongs = results.filter((row) => !row.correct);
+  const safes = results.filter((row) => row.correct);
+  const accepted = (r?.accepted || []).slice(0, 4).join(' · ') || '—';
+
+  return `
+    <p class="roast-correct muted" style="margin-top:0.65rem">
+      Correct: <strong style="color:var(--club-gold,#ffd54a)">${escapeHtml(accepted)}</strong>
+    </p>
+    ${
+      wrongs.length
+        ? `<div class="roast-block roast-block--wrong" style="margin-top:0.85rem">
+            <h3 class="roast-heading">Wrong · roast these</h3>
+            <ul class="answer-list roast-list">
+              ${wrongs
+                .map(
+                  (row) => `<li class="roast-item">
+                    <div class="name bad">${escapeHtml(row.name)}</div>
+                    <div class="roast-answer">${
+                      row.timedOut || !row.text
+                        ? '<em>(no answer)</em>'
+                        : `“${escapeHtml(row.text)}”`
+                    }</div>
+                  </li>`,
+                )
+                .join('')}
+            </ul>
+          </div>`
+        : `<p class="muted" style="margin-top:0.85rem">Nobody wrong — clean round.</p>`
+    }
+    ${
+      safes.length
+        ? `<div class="roast-block roast-block--safe" style="margin-top:0.75rem">
+            <h3 class="roast-heading muted">Safe</h3>
+            <ul class="answer-list">
+              ${safes
+                .map(
+                  (row) => `<li>
+                    <div class="name ok">${escapeHtml(row.name)} ✓</div>
+                    <div class="text">${escapeHtml(row.text || '—')}</div>
+                  </li>`,
+                )
+                .join('')}
+            </ul>
+          </div>`
+        : ''
+    }
   `;
 }
 
@@ -351,20 +387,12 @@ function render() {
     case 'eliminating':
       if (state.elimination?.stage === 'pending') {
         const r = state.reveal;
+        const wrongN = r?.eliminated ?? 0;
         main.innerHTML = `
           <div class="card">
-            <h2>Round over</h2>
-            <p class="muted">Round up — TV holding. When ready, show wrong players (eliminating × 1–3, then thumps).</p>
-            <ul class="answer-list" style="margin-top:0.75rem">
-              ${(r?.results || [])
-                .map(
-                  (row) => `<li>
-                    <div class="name ${row.correct ? 'ok' : 'bad'}">${escapeHtml(row.name)} ${row.correct ? '✓' : '✗'}</div>
-                    <div class="text">${escapeHtml(row.text)}</div>
-                  </li>`,
-                )
-                .join('')}
-            </ul>
+            <h2>Round over · ${r?.percent ?? '?'}%</h2>
+            <p class="muted">${wrongN} wrong · ${r?.survived ?? 0} safe — read the wrong answers, then hit show.</p>
+            ${renderRoastLists()}
             <button class="btn-primary big-btn" style="margin-top:0.85rem" data-act="show_results">Show wrong players</button>
           </div>`;
       } else {
@@ -376,12 +404,12 @@ function render() {
             <h2>Elimination</h2>
             <p class="muted">${
               scanning
-                ? `TV eliminating.mp3 × ${state.elimination?.stingTimes || 1} — phones flashing`
+                ? `TV eliminating.mp3 × ${state.elimination?.stingTimes || 1} — keep roasting`
                 : sting
-                  ? `Thump sequence (TV + phones)`
+                  ? `Thump sequence — keep roasting`
                   : `Lighting out ${state.elimination?.revealedCount || 0} / ${state.elimination?.wrongIds?.length || 0}`
             }</p>
-            <p class="muted">Wait for the sequence to finish, then continue.</p>
+            ${renderRoastLists()}
           </div>`;
       }
       break;

@@ -156,6 +156,40 @@ label.field input {
   color: var(--club-danger);
 }
 
+.roast-heading {
+  margin: 0 0 0.45rem;
+  font-size: 0.85rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.roast-block--wrong {
+  padding: 0.65rem 0.75rem;
+  border-radius: 12px;
+  background: rgba(180, 30, 50, 0.18);
+  border: 1px solid rgba(255, 100, 120, 0.35);
+}
+
+.roast-block--wrong .roast-heading {
+  color: #ff8a96;
+}
+
+.roast-list .roast-item {
+  margin-bottom: 0.55rem;
+}
+
+.roast-answer {
+  margin-top: 0.2rem;
+  font-size: 1.15rem;
+  font-weight: 700;
+  line-height: 1.3;
+  color: #fff;
+}
+
+.roast-block--safe {
+  opacity: 0.85;
+}
+
 .big-btn {
   width: 100%;
   padding: 1rem;
