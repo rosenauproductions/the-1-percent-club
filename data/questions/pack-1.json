@@ -10,7 +10,8 @@
         "to day",
         "the day",
         "this day"
-      ]
+      ],
+      "explanation": "Yesterday of tomorrow / tomorrow of yesterday = today."
     },
     {
       "percent": 80,
@@ -20,7 +21,8 @@
         "HAM",
         "h am",
         "ha m"
-      ]
+      ],
+      "explanation": "Look inside the letters of SHAMPOO — HAM."
     },
     {
       "percent": 70,
@@ -31,7 +33,8 @@
         "P P P Y",
         "puppy without vowels",
         "puppy"
-      ]
+      ],
+      "explanation": "KTTN is kitten without vowels; puppy without vowels is PPPY."
     },
     {
       "percent": 60,
@@ -41,7 +44,8 @@
         "ripple",
         "Ripple",
         "r i p p l e"
-      ]
+      ],
+      "explanation": "SLIVER→silver, LUBE→blue, GENRE→green; RIPPLE is not a colour anagram."
     },
     {
       "percent": 50,
@@ -55,7 +59,8 @@
         "statement c",
         "lie is c",
         "c is the lie"
-      ]
+      ],
+      "explanation": "C is impossible: leap-day birthdays 11 years apart can’t both be 29 Feb under the calendar rules implied."
     },
     {
       "percent": 45,
@@ -65,7 +70,8 @@
         "k",
         "kay",
         "the letter k"
-      ]
+      ],
+      "explanation": "Letter K: KAYAK, KIOSK, KNOCK."
     },
     {
       "percent": 40,
@@ -78,7 +84,8 @@
         "twenty fourth",
         "24th of january",
         "the 24th"
-      ]
+      ],
+      "explanation": "Dates as day numbers: 6 Apr + 15 Oct pattern → Amir is the 24th of January."
     },
     {
       "percent": 35,
@@ -89,7 +96,8 @@
         "w orm",
         "the worm"
       ],
-      "image": "owl-worm.png"
+      "image": "owl-worm.png",
+      "explanation": "Palindrome sentence: “Mr Owl ate my metal worm.”"
     },
     {
       "percent": 30,
@@ -104,7 +112,8 @@
         "the third one",
         "statement c",
         "c is impossible"
-      ]
+      ],
+      "explanation": "C is impossible — if you have a widow, you’re dead and can’t marry."
     },
     {
       "percent": 25,
@@ -117,7 +126,8 @@
         "Fourty",
         "40th",
         "the number 40"
-      ]
+      ],
+      "explanation": "FORTY — letters in alphabetical order (F-O-R-T-Y)."
     },
     {
       "percent": 20,
@@ -129,7 +139,8 @@
         "fifty six",
         "5 6",
         "fifty-six"
-      ]
+      ],
+      "explanation": "Sum the FIFA World Cup wins of each country pair → England+Germany = 56."
     },
     {
       "percent": 15,
@@ -140,7 +151,8 @@
         "APRIL",
         "apr",
         "the month of april"
-      ]
+      ],
+      "explanation": "Work through the constraints month-by-month; only April fits."
     },
     {
       "percent": 10,
@@ -152,7 +164,8 @@
         "iam a winner",
         "iama winner",
         "i am awinner"
-      ]
+      ],
+      "explanation": "Remove the letters T-W-O-L-E-T-T-E-R-S in order; leftover spells I AM A WINNER."
     },
     {
       "percent": 5,
@@ -165,7 +178,8 @@
         "Y for year",
         "y for years"
       ],
-      "image": "time-units.png"
+      "image": "time-units.png",
+      "explanation": "Second, Minute, Hour, Day, Week, Month, Year → Y."
     },
     {
       "percent": 1,
@@ -178,7 +192,8 @@
         "inconvenien ced",
         "in-convenienced"
       ],
-      "image": "alphabet-soup.png"
+      "image": "alphabet-soup.png",
+      "explanation": "Longest word from alphabet-soup letters (unlimited reuse of those glyphs): INCONVENIENCED."
     }
   ]
 }

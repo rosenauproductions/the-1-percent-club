@@ -1,0 +1,412 @@
+const PERCENTS = [90, 80, 70, 60, 50, 45, 40, 35, 30, 25, 20, 15, 10, 5, 1];
+
+/** @type {{ name: string, questions: object[] }} */
+let pack = blankPack();
+let selectedIndex = 0;
+let previewMode = 'question';
+/** @type {Record<number, string>} blob URLs for local image preview */
+const previewBlobs = {};
+
+const els = {
+  packName: document.getElementById('packName'),
+  slotList: document.getElementById('slotList'),
+  editorTitle: document.getElementById('editorTitle'),
+  prompt: document.getElementById('prompt'),
+  accepted: document.getElementById('accepted'),
+  explanation: document.getElementById('explanation'),
+  choices: document.getElementById('choices'),
+  imageName: document.getElementById('imageName'),
+  imageFile: document.getElementById('imageFile'),
+  loadJson: document.getElementById('loadJson'),
+  newPack: document.getElementById('newPack'),
+  downloadJson: document.getElementById('downloadJson'),
+  scale: document.getElementById('scale'),
+  x: document.getElementById('x'),
+  y: document.getElementById('y'),
+  scaleVal: document.getElementById('scaleVal'),
+  xVal: document.getElementById('xVal'),
+  yVal: document.getElementById('yVal'),
+  resetTransform: document.getElementById('resetTransform'),
+  previewMain: document.getElementById('previewMain'),
+  imageReminder: document.getElementById('imageReminder'),
+};
+
+function blankQuestion(percent) {
+  return {
+    percent,
+    prompt: '',
+    accepted: [],
+    explanation: '',
+    choices: [],
+    image: '',
+    imageTransform: { scale: 1, x: 0, y: 0 },
+  };
+}
+
+function blankPack() {
+  return {
+    name: 'My Question Pack',
+    questions: PERCENTS.map((p) => blankQuestion(p)),
+  };
+}
+
+function escapeHtml(s) {
+  return String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function parseList(text) {
+  return String(text || '')
+    .split(/[\n,]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+function currentQ() {
+  return pack.questions[selectedIndex];
+}
+
+function ensureTransform(q) {
+  if (!q.imageTransform || typeof q.imageTransform !== 'object') {
+    q.imageTransform = { scale: 1, x: 0, y: 0 };
+  }
+  const t = q.imageTransform;
+  t.scale = Number.isFinite(Number(t.scale)) ? Number(t.scale) : 1;
+  t.x = Number.isFinite(Number(t.x)) ? Number(t.x) : 0;
+  t.y = Number.isFinite(Number(t.y)) ? Number(t.y) : 0;
+  return t;
+}
+
+function imageTransformStyle(t) {
+  if (!t) return '';
+  return `transform: translate(${t.x}%, ${t.y}%) scale(${t.scale}); transform-origin: center center;`;
+}
+
+function imageSrcFor(q, index) {
+  if (previewBlobs[index]) return previewBlobs[index];
+  const name = String(q.image || '').trim();
+  if (!name) return '';
+  if (name.startsWith('/') || name.startsWith('http')) return name;
+  const folder = slugFromPackName(pack.name);
+  return `/images/questions/${folder}/${name}`;
+}
+
+function slugFromPackName(name) {
+  const base = String(name || 'pack')
+    .toLowerCase()
+    .replace(/\.json$/i, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+  return base || 'pack';
+}
+
+function renderSlots() {
+  els.slotList.innerHTML = pack.questions
+    .map((q, i) => {
+      const tip = (q.prompt || '').trim() || 'Empty';
+      return `<button type="button" class="slot-btn ${i === selectedIndex ? 'is-active' : ''}" data-i="${i}">
+        ${q.percent}%
+        <small>${escapeHtml(tip)}</small>
+      </button>`;
+    })
+    .join('');
+}
+
+function renderImageReminder() {
+  const names = [
+    ...new Set(
+      pack.questions
+        .map((q) => String(q.image || '').trim())
+        .filter((n) => n && !n.startsWith('/') && !n.startsWith('http')),
+    ),
+  ];
+  if (!names.length) {
+    els.imageReminder.textContent =
+      'No image filenames yet. When you download, zip matching files under public/images/questions/<pack>/';
+    return;
+  }
+  els.imageReminder.innerHTML = `<strong>Zip these with the pack:</strong><br>${names
+    .map((n) => escapeHtml(n))
+    .join('<br>')}`;
+}
+
+function fillEditor() {
+  const q = currentQ();
+  const t = ensureTransform(q);
+  els.packName.value = pack.name || '';
+  els.editorTitle.textContent = `${q.percent}% question`;
+  els.prompt.value = q.prompt || '';
+  els.accepted.value = Array.isArray(q.accepted) ? q.accepted.join('\n') : '';
+  els.explanation.value = q.explanation || '';
+  els.choices.value = Array.isArray(q.choices) ? q.choices.join('\n') : '';
+  els.imageName.value = q.image || '';
+  els.scale.value = String(t.scale);
+  els.x.value = String(t.x);
+  els.y.value = String(t.y);
+  els.scaleVal.textContent = Number(t.scale).toFixed(2);
+  els.xVal.textContent = String(Math.round(t.x));
+  els.yVal.textContent = String(Math.round(t.y));
+}
+
+function readEditorIntoPack() {
+  const q = currentQ();
+  pack.name = els.packName.value.trim() || 'My Question Pack';
+  q.prompt = els.prompt.value;
+  q.accepted = parseList(els.accepted.value);
+  q.explanation = els.explanation.value.trim();
+  q.choices = parseList(els.choices.value);
+  q.image = els.imageName.value.trim();
+  q.imageTransform = {
+    scale: Number(els.scale.value),
+    x: Number(els.x.value),
+    y: Number(els.y.value),
+  };
+}
+
+function renderChoices(choices) {
+  if (!choices?.length) return '';
+  return `<div class="q-choices">${choices
+    .map((c, i) => {
+      const letter = String.fromCharCode(65 + i);
+      return `<div class="q-choice"><span class="q-choice__letter">${letter}</span><span class="q-choice__text">${escapeHtml(c)}</span></div>`;
+    })
+    .join('')}</div>`;
+}
+
+function renderPreview() {
+  const q = currentQ();
+  const t = ensureTransform(q);
+  const src = imageSrcFor(q, selectedIndex);
+  const hasImage = Boolean(src);
+  const hasChoices = Array.isArray(q.choices) && q.choices.length > 0;
+  const accepted = (q.accepted || []).slice(0, 3).join(' / ') || '—';
+
+  if (previewMode === 'answer') {
+    els.previewMain.innerHTML = `
+      <div class="reveal-layout reveal-layout--answer-only">
+        <div class="pct-badge" style="align-self:center">${q.percent}%</div>
+        ${
+          hasImage
+            ? `<div class="question-image-wrap question-image-wrap--reveal"><img class="question-image" src="${escapeHtml(src)}" alt="" style="${imageTransformStyle(t)}" /></div>`
+            : ''
+        }
+        <div class="answer-banner">
+          <div class="answer-banner__label">CORRECT ANSWER</div>
+          <div class="answer-banner__value">${escapeHtml(accepted)}</div>
+        </div>
+      </div>`;
+    return;
+  }
+
+  els.previewMain.innerHTML = `
+    <div class="question-layout">
+      <div class="question-panel">
+        <div class="pct-badge">${q.percent}%<small>OF PEOPLE GOT THIS RIGHT</small></div>
+        <div class="question-flow ${hasImage ? 'question-flow--has-image' : ''}" data-image-layout="stack">
+          <p class="prompt q-area-prompt">${escapeHtml(q.prompt || 'Prompt…')}</p>
+          ${
+            hasImage
+              ? `<div class="question-image-wrap q-area-image"><img class="question-image" src="${escapeHtml(src)}" alt="" style="${imageTransformStyle(t)}" /></div>`
+              : ''
+          }
+          ${hasChoices ? `<div class="q-area-choices">${renderChoices(q.choices)}</div>` : '<div class="q-area-choices"></div>'}
+          <div class="q-area-meta">
+            <div class="timer" id="tvTimer">30</div>
+            <div class="lock-progress">0 / 12 locked in</div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function refresh() {
+  renderSlots();
+  fillEditor();
+  renderPreview();
+  renderImageReminder();
+}
+
+function selectIndex(i) {
+  readEditorIntoPack();
+  selectedIndex = Math.max(0, Math.min(PERCENTS.length - 1, i));
+  refresh();
+}
+
+function normalizeLoaded(raw) {
+  let name = 'My Question Pack';
+  let list = [];
+  if (Array.isArray(raw)) {
+    list = raw;
+  } else if (raw && typeof raw === 'object') {
+    name = raw.name || name;
+    list = raw.questions || [];
+  }
+  const byPercent = new Map();
+  for (const q of list) {
+    const pct = Number(q.percent);
+    if (PERCENTS.includes(pct)) byPercent.set(pct, q);
+  }
+  return {
+    name,
+    questions: PERCENTS.map((percent) => {
+      const src = byPercent.get(percent) || blankQuestion(percent);
+      const q = blankQuestion(percent);
+      q.prompt = src.prompt ?? src.question ?? '';
+      q.accepted = Array.isArray(src.accepted)
+        ? src.accepted.map(String)
+        : Array.isArray(src.answers)
+          ? src.answers.map(String)
+          : src.answer
+            ? [String(src.answer)]
+            : [];
+      q.explanation = src.explanation ? String(src.explanation) : '';
+      q.choices = Array.isArray(src.choices) ? src.choices.map(String) : [];
+      q.image = src.image ? String(src.image) : '';
+      q.imageTransform = normalizeTransform(src.imageTransform);
+      return q;
+    }),
+  };
+}
+
+function normalizeTransform(t) {
+  if (!t || typeof t !== 'object') return { scale: 1, x: 0, y: 0 };
+  return {
+    scale: Number.isFinite(Number(t.scale)) ? Number(t.scale) : 1,
+    x: Number.isFinite(Number(t.x)) ? Number(t.x) : 0,
+    y: Number.isFinite(Number(t.y)) ? Number(t.y) : 0,
+  };
+}
+
+function exportPack() {
+  readEditorIntoPack();
+  return {
+    name: pack.name,
+    questions: pack.questions.map((q) => {
+      const out = {
+        percent: q.percent,
+        prompt: q.prompt || '',
+        accepted: q.accepted || [],
+      };
+      if (q.explanation) out.explanation = q.explanation;
+      if (q.choices?.length) out.choices = q.choices;
+      if (q.image) {
+        out.image = q.image;
+        const t = ensureTransform(q);
+        if (t.scale !== 1 || t.x !== 0 || t.y !== 0) {
+          out.imageTransform = { scale: t.scale, x: t.x, y: t.y };
+        }
+      }
+      return out;
+    }),
+  };
+}
+
+els.slotList.addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-i]');
+  if (!btn) return;
+  selectIndex(Number(btn.getAttribute('data-i')));
+});
+
+[
+  els.prompt,
+  els.accepted,
+  els.explanation,
+  els.choices,
+  els.imageName,
+  els.packName,
+].forEach((el) => {
+  el.addEventListener('input', () => {
+    readEditorIntoPack();
+    renderSlots();
+    renderPreview();
+    renderImageReminder();
+  });
+});
+
+function onTransformInput() {
+  els.scaleVal.textContent = Number(els.scale.value).toFixed(2);
+  els.xVal.textContent = String(Math.round(Number(els.x.value)));
+  els.yVal.textContent = String(Math.round(Number(els.y.value)));
+  readEditorIntoPack();
+  renderPreview();
+}
+
+[els.scale, els.x, els.y].forEach((el) => el.addEventListener('input', onTransformInput));
+
+els.resetTransform.addEventListener('click', () => {
+  els.scale.value = '1';
+  els.x.value = '0';
+  els.y.value = '0';
+  onTransformInput();
+});
+
+els.imageFile.addEventListener('change', () => {
+  const file = els.imageFile.files?.[0];
+  if (!file) return;
+  if (previewBlobs[selectedIndex]) URL.revokeObjectURL(previewBlobs[selectedIndex]);
+  previewBlobs[selectedIndex] = URL.createObjectURL(file);
+  if (!els.imageName.value.trim()) {
+    els.imageName.value = file.name;
+  }
+  readEditorIntoPack();
+  renderPreview();
+  renderImageReminder();
+});
+
+els.loadJson.addEventListener('change', async () => {
+  const file = els.loadJson.files?.[0];
+  if (!file) return;
+  try {
+    const text = await file.text();
+    pack = normalizeLoaded(JSON.parse(text));
+    Object.keys(previewBlobs).forEach((k) => {
+      URL.revokeObjectURL(previewBlobs[k]);
+      delete previewBlobs[k];
+    });
+    selectedIndex = 0;
+    refresh();
+  } catch (err) {
+    alert(`Could not load JSON: ${err.message || err}`);
+  }
+  els.loadJson.value = '';
+});
+
+els.newPack.addEventListener('click', () => {
+  if (!confirm('Start a blank 15-slot pack? Unsaved edits will be lost.')) return;
+  Object.keys(previewBlobs).forEach((k) => {
+    URL.revokeObjectURL(previewBlobs[k]);
+    delete previewBlobs[k];
+  });
+  pack = blankPack();
+  selectedIndex = 0;
+  refresh();
+});
+
+els.downloadJson.addEventListener('click', () => {
+  const data = exportPack();
+  const blob = new Blob([JSON.stringify(data, null, 2) + '\n'], {
+    type: 'application/json',
+  });
+  const a = document.createElement('a');
+  const slug = slugFromPackName(data.name);
+  a.href = URL.createObjectURL(blob);
+  a.download = `${slug}.json`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  renderImageReminder();
+});
+
+document.querySelectorAll('[data-preview]').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    previewMode = btn.getAttribute('data-preview');
+    document.querySelectorAll('[data-preview]').forEach((b) => b.classList.remove('is-active'));
+    btn.classList.add('is-active');
+    readEditorIntoPack();
+    renderPreview();
+  });
+});
+
+refresh();

@@ -1,0 +1,224 @@
+.admin-body {
+  min-height: 100vh;
+  margin: 0;
+  background: var(--club-navy);
+  color: var(--club-white);
+  font-family: var(--font-body);
+}
+
+.admin-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid rgba(46, 230, 255, 0.18);
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.admin-title {
+  font-family: var(--font-display);
+  letter-spacing: 0.08em;
+  color: var(--club-cyan);
+}
+
+.admin-sub {
+  font-size: 0.85rem;
+  margin-top: 0.2rem;
+}
+
+.admin-header__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.file-btn {
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+}
+
+.admin-shell {
+  display: grid;
+  grid-template-columns: minmax(180px, 220px) minmax(280px, 1fr) minmax(320px, 1.2fr);
+  gap: 1rem;
+  padding: 1rem;
+  align-items: start;
+}
+
+@media (max-width: 1100px) {
+  .admin-shell {
+    grid-template-columns: 1fr;
+  }
+}
+
+.admin-sidebar,
+.admin-editor,
+.admin-preview {
+  min-width: 0;
+}
+
+.admin-sidebar .field {
+  margin-bottom: 0.75rem;
+}
+
+.slot-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  max-height: 70vh;
+  overflow: auto;
+}
+
+.slot-btn {
+  text-align: left;
+  padding: 0.55rem 0.7rem;
+  border-radius: 10px;
+  border: 1px solid rgba(46, 230, 255, 0.2);
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--club-white);
+  cursor: pointer;
+  font: inherit;
+}
+
+.slot-btn:hover {
+  border-color: rgba(46, 230, 255, 0.45);
+}
+
+.slot-btn.is-active {
+  border-color: var(--club-cyan);
+  box-shadow: var(--shadow-glow);
+}
+
+.slot-btn small {
+  display: block;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  margin-top: 0.15rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.image-reminder {
+  margin-top: 0.85rem;
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.admin-editor.card {
+  padding: 1rem 1.1rem 1.25rem;
+}
+
+.admin-editor h2 {
+  margin: 0 0 0.85rem;
+  font-size: 1.15rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 0.85rem;
+}
+
+.field span {
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.field input,
+.field textarea {
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid rgba(46, 230, 255, 0.25);
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--club-white);
+  padding: 0.55rem 0.7rem;
+  font: inherit;
+  resize: vertical;
+}
+
+.field-row {
+  display: flex;
+  gap: 0.65rem;
+  align-items: end;
+  margin-bottom: 0.85rem;
+}
+
+.field-row .grow {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+.field-file {
+  margin-bottom: 0.15rem;
+  height: fit-content;
+}
+
+.transform-grid {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.transform-grid input[type='range'] {
+  width: 100%;
+}
+
+.admin-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.preview-label {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.admin-display-frame {
+  position: relative;
+  height: min(62vh, 520px);
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid rgba(46, 230, 255, 0.25);
+  background: #000;
+}
+
+.admin-display-frame .display-stage {
+  height: 100%;
+}
+
+.admin-display-frame .display-stage__inner {
+  --u: 0.55vmin;
+}
+
+.preview-modes {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.preview-modes .btn-ghost.is-active {
+  border-color: var(--club-cyan);
+  color: var(--club-cyan);
+}
+
+.admin-display-frame .question-image {
+  max-height: 28vh;
+  object-fit: contain;
+  transition: transform 0.05s linear;
+}
+
+.admin-display-frame .side-grid {
+  display: none;
+}
+
+.admin-display-frame .question-layout {
+  grid-template-columns: 1fr;
+}

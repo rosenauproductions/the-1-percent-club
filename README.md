@@ -103,18 +103,23 @@ JSON files in `data/questions/`. Need **15** questions in order (90% → 1%):
 Put images in a folder named after the pack file:
 
 ```
-data/questions/sample.json
-public/images/questions/sample/q01.png
-public/images/questions/sample/q14.jpg
+data/questions/pack-1.json
+public/images/questions/pack-1/owl-worm.png
 ```
 
-Then set `"image": "q01.png"` on that question. The TV shows it **above** the prompt when space allows (between instructions and choices); if it can’t fit, the image moves to the **left**.
+Then set `"image": "owl-worm.png"` on that question. The TV shows it **above** the prompt when space allows (between instructions and choices); if it can’t fit, the image moves to the **left**.
 
 Optional `"choices": ["A text", "B text", …]` draws A/B/C tiles on the TV. Players can still type the word or letter.
 
+Optional `"explanation": "…"` is host-only (shown during the roast beat before **Show right answer**).
+
+Optional `"imageTransform": { "scale": 1, "x": 0, "y": 0 }` nudges the TV image (use `/admin` to preview).
+
 - Relative names resolve to `/images/questions/<packName>/…`
-- Or use a full path: `"image": "/images/questions/sample/q01.png"`
+- Or use a full path: `"image": "/images/questions/pack-1/owl-worm.png"`
 - Omit `image` / `choices` for plain text questions
+
+Start from `data/pack-template.json`, or edit packs in the local **`/admin`** editor and download JSON.
 
 Answers are graded with case-insensitive normalized matching. Host can force ✓/✗ on reveal.
 
@@ -128,6 +133,7 @@ data/questions/  # Packs
 public/display/  # TV
 public/host/     # Host phone
 public/play/     # Contestant phones
+public/admin/    # Local pack editor (unlisted /admin)
 public/sounds/   # Swap-in audio
 public/images/   # Temp art
 ```

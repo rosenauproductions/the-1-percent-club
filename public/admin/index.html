@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>The 1% Club — Pack editor</title>
+  <link rel="stylesheet" href="/shared/theme.css" />
+  <link rel="stylesheet" href="/display/display.css" />
+  <link rel="stylesheet" href="admin.css" />
+</head>
+<body class="admin-body">
+  <header class="admin-header">
+    <div>
+      <div class="admin-title">PACK EDITOR</div>
+      <div class="admin-sub muted">Local only · download JSON · zip images next to the pack</div>
+    </div>
+    <div class="admin-header__actions">
+      <label class="btn-ghost file-btn">
+        Load JSON
+        <input type="file" id="loadJson" accept="application/json,.json" hidden />
+      </label>
+      <button type="button" class="btn-ghost" id="newPack">Blank pack</button>
+      <button type="button" class="btn-primary" id="downloadJson">Download JSON</button>
+    </div>
+  </header>
+
+  <div class="admin-shell">
+    <aside class="admin-sidebar">
+      <label class="field">
+        <span>Pack name</span>
+        <input type="text" id="packName" placeholder="My Question Pack" />
+      </label>
+      <div class="slot-list" id="slotList"></div>
+      <div class="image-reminder muted" id="imageReminder"></div>
+    </aside>
+
+    <section class="admin-editor card">
+      <h2 id="editorTitle">Question</h2>
+      <label class="field">
+        <span>Prompt</span>
+        <textarea id="prompt" rows="4"></textarea>
+      </label>
+      <label class="field">
+        <span>Accepted answers <span class="muted">(comma or newline)</span></span>
+        <textarea id="accepted" rows="3"></textarea>
+      </label>
+      <label class="field">
+        <span>Explanation <span class="muted">(host-only roast tip)</span></span>
+        <textarea id="explanation" rows="3"></textarea>
+      </label>
+      <label class="field">
+        <span>Choices <span class="muted">(optional, one per line → A/B/C…)</span></span>
+        <textarea id="choices" rows="3"></textarea>
+      </label>
+      <div class="field-row">
+        <label class="field grow">
+          <span>Image filename</span>
+          <input type="text" id="imageName" placeholder="owl-worm.png" />
+        </label>
+        <label class="btn-ghost file-btn field-file">
+          Preview image
+          <input type="file" id="imageFile" accept="image/*" hidden />
+        </label>
+      </div>
+      <div class="transform-grid" id="transformPanel">
+        <label class="field">
+          <span>Scale <span id="scaleVal">1.00</span></span>
+          <input type="range" id="scale" min="0.2" max="3" step="0.01" value="1" />
+        </label>
+        <label class="field">
+          <span>Offset X <span id="xVal">0</span>%</span>
+          <input type="range" id="x" min="-100" max="100" step="1" value="0" />
+        </label>
+        <label class="field">
+          <span>Offset Y <span id="yVal">0</span>%</span>
+          <input type="range" id="y" min="-100" max="100" step="1" value="0" />
+        </label>
+        <button type="button" class="btn-ghost" id="resetTransform">Reset transform</button>
+      </div>
+    </section>
+
+    <section class="admin-preview">
+      <div class="preview-label muted">TV preview</div>
+      <div class="display-body admin-display-frame">
+        <div class="display-stage">
+          <div class="display-stage__inner">
+            <div class="arena-bg"></div>
+            <header class="top-bar">
+              <div class="brand">THE <span>1%</span> CLUB</div>
+              <div class="jackpot-chip">
+                <span class="jackpot-chip__label">JACKPOT</span>
+                <span class="jackpot-chip__value money">$15,000</span>
+              </div>
+              <div class="alive-chip"><span>12</span> IN</div>
+            </header>
+            <main class="main" id="previewMain"></main>
+          </div>
+        </div>
+      </div>
+      <div class="preview-modes">
+        <button type="button" class="btn-ghost is-active" data-preview="question">Question</button>
+        <button type="button" class="btn-ghost" data-preview="answer">Right answer</button>
+      </div>
+    </section>
+  </div>
+
+  <script type="module" src="admin.js"></script>
+</body>
+</html>

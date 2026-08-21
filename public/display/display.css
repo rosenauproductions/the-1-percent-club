@@ -628,6 +628,32 @@ body.display-body {
   color: var(--text-muted);
 }
 
+.elim-status {
+  font-family: var(--font-display);
+  font-size: calc(2.2 * var(--u));
+  letter-spacing: 0.08em;
+  color: var(--club-cyan);
+  text-align: center;
+}
+
+.elim-status--scan {
+  animation: elim-pulse 0.9s ease-in-out infinite;
+}
+
+@keyframes elim-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.question-layout--elim .q-area-meta {
+  justify-content: center;
+}
+
 body.left-count-mode .top-bar,
 body.prize-pot-mode .top-bar {
   opacity: 0.15;

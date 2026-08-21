@@ -9,6 +9,7 @@ import {
   stopAllMusic,
   playEliminatingUntilStopped,
   stopPendingEliminating,
+  seekTimerToEnd,
 } from '../shared/audio.js';
 import { installErrorHandlers, mountQaWidget, showBoot, hideBoot } from '../shared/boot.js';
 
@@ -205,7 +206,7 @@ function renderQuestion() {
           <p class="prompt q-area-prompt">${escapeHtml(q?.prompt ?? '')}</p>
           ${
             hasImage
-              ? `<div class="question-image-wrap q-area-image"><img class="question-image" src="${escapeHtml(q.image)}" alt="" /></div>`
+              ? `<div class="question-image-wrap q-area-image"><img class="question-image" src="${escapeHtml(q.image)}" alt="" style="${imageTransformStyle(q.imageTransform)}" /></div>`
               : ''
           }
           ${hasChoices ? `<div class="q-area-choices">${renderChoices(q.choices)}</div>` : '<div class="q-area-choices"></div>'}
@@ -266,48 +267,44 @@ function renderEliminating() {
   const pending = elim.stage === 'pending';
   const scanning = elim.stage === 'scanning';
   const sting = elim.stage === 'sting' || scanning;
+  const q = state.currentQuestion;
+  const hasImage = !!q?.image;
+  const hasChoices = Array.isArray(q?.choices) && q.choices.length > 0;
   const outCount = elim.revealedCount || 0;
   const leftCount = state.players.filter((p) => p.status === 'active').length;
-  const current = state.players.find((p) => p.id === elim.currentId);
-  // Show running tally once anyone has been revealed (and keep it through later stings)
   const showTally = !pending && !scanning && outCount > 0;
+  let statusLine = '';
+  if (pending) statusLine = 'Waiting for the host…';
+  else if (sting) statusLine = 'Blue lights scanning…';
+  else if (showTally) statusLine = `${outCount} out · ${leftCount} left`;
 
+  // Keep the question on screen the entire blue-light beat (TV show style).
   main.innerHTML = `
-    <div class="elim-layout">
-      <div class="elim-panel">
-        <div class="pct-badge">${state.currentQuestion?.percent ?? '?'}%</div>
-        <h2 class="elim-title">${
-          pending
-            ? 'THE <span class="pct">1%</span> CLUB'
-            : sting
-              ? 'SEARCHING…'
-              : "YOU'RE OUT"
-        }</h2>
-        ${
-          showTally
-            ? `<div class="elim-tally">
-          <div class="elim-tally__row elim-tally__row--out">
-            <span class="elim-tally__value" id="elimOutCount">${outCount}</span>
-            <span class="elim-tally__label">out</span>
+    <div class="question-layout question-layout--elim">
+      <div class="question-panel" id="questionPanel">
+        <div class="pct-badge">${q?.percent ?? '?'}%<small>OF PEOPLE GOT THIS RIGHT</small></div>
+        <div class="question-flow ${hasImage ? 'question-flow--has-image' : ''}" data-image-layout="stack">
+          <p class="prompt q-area-prompt">${escapeHtml(q?.prompt ?? '')}</p>
+          ${
+            hasImage
+              ? `<div class="question-image-wrap q-area-image"><img class="question-image" src="${escapeHtml(q.image)}" alt="" style="${imageTransformStyle(q.imageTransform)}" /></div>`
+              : ''
+          }
+          ${hasChoices ? `<div class="q-area-choices">${renderChoices(q.choices)}</div>` : '<div class="q-area-choices"></div>'}
+          <div class="q-area-meta">
+            <div class="elim-status ${sting ? 'elim-status--scan' : ''}">${escapeHtml(statusLine)}</div>
           </div>
-          <div class="elim-tally__row elim-tally__row--left">
-            <span class="elim-tally__value" id="elimLeftCount">${leftCount}</span>
-            <span class="elim-tally__label">left</span>
-          </div>
-        </div>`
-            : ''
-        }
-        ${
-          current && !pending && !sting
-            ? `<p class="elim-current">${escapeHtml(current.name)}</p>`
-            : `<p class="elim-current muted">${
-                sting ? 'Blue lights scanning…' : pending ? '' : ' '
-              }</p>`
-        }
+        </div>
       </div>
       <div class="side-grid">${renderSeatGrid(state.players)}</div>
     </div>
   `;
+
+  if (hasImage) {
+    requestAnimationFrame(() => syncQuestionImageLayout());
+    const img = main.querySelector('.question-image');
+    img?.addEventListener('load', () => syncQuestionImageLayout(), { once: true });
+  }
 }
 
 function renderEliminatedCount() {
@@ -337,7 +334,10 @@ function renderLeftCount() {
 }
 
 function renderPrizePot() {
-  const amount = money(state.jackpot);
+  const to = Number(state.jackpot) || 0;
+  const from = Number.isFinite(Number(state.prevJackpot))
+    ? Number(state.prevJackpot)
+    : to;
   const signs = Array.from({ length: 36 }, (_, i) => {
     const left = 4 + ((i * 17) % 92);
     const delay = ((i * 0.11) % 2.4).toFixed(2);
@@ -351,10 +351,58 @@ function renderPrizePot() {
       <div class="prize-pot__glow"></div>
       <div class="prize-pot__ring"></div>
       <div class="prize-pot__signs" aria-hidden="true">${signs}</div>
-      <div class="prize-pot__amount">${escapeHtml(amount)}</div>
+      <div class="prize-pot__amount" id="prizePotAmount">${escapeHtml(money(from))}</div>
       <div class="prize-pot__label">PRIZE POT</div>
     </div>
   `;
+
+  const el = document.getElementById('prizePotAmount');
+  if (el && from !== to) {
+    animateMoney(el, from, to, 2200);
+  } else if (el) {
+    el.textContent = money(to);
+  }
+}
+
+function animateMoney(el, from, to, durationMs) {
+  const start = performance.now();
+  const delta = to - from;
+  const tick = (now) => {
+    const t = Math.min(1, (now - start) / durationMs);
+    const eased = 1 - (1 - t) ** 3;
+    el.textContent = money(Math.round(from + delta * eased));
+    if (t < 1) requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}
+
+function renderAnswerReveal() {
+  const r = state.reveal;
+  const accepted = (r?.accepted || []).slice(0, 3).join(' / ');
+  const q = state.currentQuestion;
+  main.innerHTML = `
+    <div class="reveal-layout reveal-layout--answer-only">
+      <div class="pct-badge" style="align-self:center">${r?.percent ?? '?'}%</div>
+      ${
+        q?.image
+          ? `<div class="question-image-wrap question-image-wrap--reveal"><img class="question-image" src="${escapeHtml(q.image)}" alt="" style="${imageTransformStyle(q.imageTransform)}" /></div>`
+          : ''
+      }
+      <div class="answer-banner">
+        <div class="answer-banner__label">CORRECT ANSWER</div>
+        <div class="answer-banner__value">${escapeHtml(accepted)}</div>
+      </div>
+    </div>
+  `;
+}
+
+function imageTransformStyle(t) {
+  if (!t || typeof t !== 'object') return '';
+  const scale = Number(t.scale);
+  const x = Number(t.x);
+  const y = Number(t.y);
+  if (![scale, x, y].every((n) => Number.isFinite(n))) return '';
+  return `transform: translate(${x}%, ${y}%) scale(${scale}); transform-origin: center center;`;
 }
 
 function renderReveal() {
@@ -362,12 +410,13 @@ function renderReveal() {
   const accepted = (r?.accepted || []).slice(0, 3).join(' / ');
   const leftCount = state.players.filter((p) => p.status === 'active').length;
   const outCount = r?.eliminated ?? state.players.filter((p) => p.status === 'out').length;
+  const q = state.currentQuestion;
   main.innerHTML = `
     <div class="reveal-layout">
       <div class="pct-badge" style="align-self:center">${r?.percent ?? '?'}%</div>
       ${
-        state.currentQuestion?.image
-          ? `<div class="question-image-wrap question-image-wrap--reveal"><img class="question-image" src="${escapeHtml(state.currentQuestion.image)}" alt="" /></div>`
+        q?.image
+          ? `<div class="question-image-wrap question-image-wrap--reveal"><img class="question-image" src="${escapeHtml(q.image)}" alt="" style="${imageTransformStyle(q.imageTransform)}" /></div>`
           : ''
       }
       <div class="answer-banner">
@@ -418,7 +467,11 @@ function renderSolo() {
 
 function renderFinale() {
   const winners = state.players.filter(
-    (p) => p.status === 'winner' || p.status === 'took10k' || p.status === 'cashed',
+    (p) =>
+      p.status === 'winner' ||
+      p.status === 'took10k' ||
+      p.status === 'cashed' ||
+      (p.winnings > 0 && p.status === 'out'),
   );
   const big = winners.filter((p) => p.status === 'winner');
   main.innerHTML = `
@@ -427,10 +480,13 @@ function renderFinale() {
       <p>Final jackpot: ${money(state.jackpot)}</p>
       <ul class="winner-list">
         ${winners
-          .map(
-            (p) =>
-              `<li>${escapeHtml(p.name)} · ${money(p.winnings)}${p.status === 'took10k' ? ' (took $10k)' : p.status === 'cashed' ? ' (cashed out)' : ''}</li>`,
-          )
+          .map((p) => {
+            let tag = '';
+            if (p.status === 'took10k') tag = ' (took $10k)';
+            else if (p.status === 'cashed') tag = ' (cashed out)';
+            else if (p.status === 'out') tag = ' (kept $1k bonus)';
+            return `<li>${escapeHtml(p.name)} · ${money(p.winnings)}${tag}</li>`;
+          })
           .join('') || '<li>Nobody survived</li>'}
       </ul>
     </div>
@@ -476,6 +532,9 @@ function render() {
     case 'left_count':
       renderLeftCount();
       break;
+    case 'answer_reveal':
+      renderAnswerReveal();
+      break;
     case 'prize_pot':
       renderPrizePot();
       break;
@@ -515,6 +574,16 @@ async function handleSoundCue(cue) {
 
   // Phone-only cues — TV stays silent; server timer advances
   if (cue.audience === 'play') {
+    return;
+  }
+
+  if (cue.name === 'timer_seek') {
+    const fromEnd = cue.secondsFromEnd ?? 3;
+    if (!seekTimerToEnd(fromEnd)) {
+      stopAllMusic();
+      await playSound('timer', { asMusic: false });
+      seekTimerToEnd(fromEnd);
+    }
     return;
   }
 

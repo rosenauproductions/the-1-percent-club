@@ -29,6 +29,29 @@ function escapeHtml(s) {
     .replace(/>/g, '&gt;');
 }
 
+const HOST_SNARK = [
+  'Let’s put all the ugliness behind us… and focus on the ugliness ahead.',
+  'Congratulations to everyone who just donated their thousand dollars to the smarter people.',
+  'That was a bloodbath. I feel like I should be offering counseling.',
+  'If you just got a blue light, thank you for your generous contribution to the pot.',
+  'We’ve gone from hopefuls to… significantly fewer hopefuls.',
+];
+
+function pickSnark(seed) {
+  const i = Math.abs(Number(seed) || 0) % HOST_SNARK.length;
+  return HOST_SNARK[i];
+}
+
+function isWipeoutPending() {
+  return state?.pendingAfterReveal === 'wipeout_final';
+}
+
+function advanceLabel({ allOut = false } = {}) {
+  if (isWipeoutPending()) return 'Continue · final decision';
+  if (allOut || state?.pendingAfterReveal === 'game_end') return 'End game';
+  return null;
+}
+
 async function act(action, payload = {}) {
   try {
     await sendAction(action, payload);
@@ -43,7 +66,7 @@ async function loadPacks() {
     const data = await res.json();
     questionFiles = data.files || [];
   } catch {
-    questionFiles = ['sample.json'];
+    questionFiles = ['pack-1.json'];
   }
 }
 
@@ -362,6 +385,7 @@ function render() {
         state.reveal?.eliminated ??
         state.elimination?.wrongIds?.length ??
         state.players.filter((p) => p.status === 'out').length;
+      const wipeout = isWipeoutPending();
       const allOut =
         state.pendingAfterReveal === 'game_end' || activePlayers().length === 0;
       main.innerHTML = `
@@ -369,43 +393,98 @@ function render() {
           <h2>${outCount} eliminated</h2>
           <p class="muted">
             ${
-              allOut
-                ? 'Everyone is out. TV is on the eliminated board — roast them, then end.'
-                : 'TV is showing outs. Next: who remains, then you roast.'
+              wipeout
+                ? 'Full wipeout — furthest contestants become finalists after the boards.'
+                : allOut
+                  ? 'Everyone is out. TV is on the eliminated board — roast them, then end.'
+                  : 'TV is showing outs. Next: who remains, then you roast.'
             }
           </p>
-          ${allOut ? renderRoastLists() : ''}
+          ${allOut || wipeout ? renderRoastLists() : ''}
           <button class="btn-primary big-btn" style="margin-top:0.85rem" data-act="advance">
-            ${allOut ? 'End game' : 'Show who remains'}
+            ${advanceLabel({ allOut }) || 'Show who remains'}
           </button>
         </div>`;
       break;
     }
     case 'left_count': {
       const left = activePlayers().length;
+      const wipeout = isWipeoutPending();
       const allOut =
         state.pendingAfterReveal === 'game_end' || left === 0;
+      const explanation =
+        state.reveal?.explanation ||
+        'TEMP: Explain how this one works — why the correct answer is right.';
       main.innerHTML = `
         <div class="card">
-          <h2>${left} left!</h2>
+          <h2>${wipeout ? '0 left — wipeout!' : `${left} left!`}</h2>
           <p class="host-script" style="margin:0.65rem 0;font-weight:700;line-height:1.4">
-            Blue lights and thumps are done. TV shows who’s left — now roast the wrong answers.
+            ${
+              wipeout
+                ? 'Everyone missed. Roast them, show the answer, then jump to the Final Decision.'
+                : 'Blue lights and thumps are done. TV shows who’s left — now roast the wrong answers.'
+            }
           </p>
           ${renderRoastLists()}
-          <button class="btn-primary big-btn" style="margin-top:0.85rem" data-act="advance">
-            ${allOut ? 'End game' : 'Done roasting · prize pot'}
+          <div class="host-explanation" style="margin:0.85rem 0;padding:0.75rem 0.9rem;border-radius:12px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12)">
+            <div class="muted" style="font-size:0.75rem;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:0.35rem">How to answer</div>
+            <p style="margin:0;line-height:1.45;font-weight:600">${escapeHtml(explanation)}</p>
+          </div>
+          <button class="btn-primary big-btn" style="margin-top:0.5rem" data-act="show_right_answer">
+            Show right answer
+          </button>
+          <button class="btn-ghost big-btn" style="margin-top:0.65rem" data-act="advance">
+            ${advanceLabel({ allOut }) || 'Done roasting · prize pot'}
           </button>
         </div>`;
       break;
     }
-    case 'prize_pot':
+    case 'answer_reveal': {
+      const left = activePlayers().length;
+      const allOut =
+        state.pendingAfterReveal === 'game_end' || left === 0;
+      const accepted = (state.reveal?.accepted || []).slice(0, 3).join(' / ');
+      main.innerHTML = `
+        <div class="card">
+          <h2>Right answer on TV</h2>
+          <p class="muted" style="margin:0.5rem 0">Correct: <strong>${escapeHtml(accepted || '—')}</strong></p>
+          ${renderRoastLists()}
+          <button class="btn-primary big-btn" style="margin-top:0.85rem" data-act="advance">
+            ${advanceLabel({ allOut }) || 'Done roasting · prize pot'}
+          </button>
+        </div>`;
+      break;
+    }
+    case 'prize_pot': {
+      const snark = pickSnark(
+        (state.questionIndex ?? 0) * 17 + (state.jackpot ?? 0),
+      );
+      const wipeout = isWipeoutPending();
+      const nextLabel =
+        advanceLabel() ||
+        (state.pendingAfterReveal === 'solo_offer'
+          ? 'Continue · solo offer'
+          : state.pendingAfterReveal === 'final_choice'
+            ? 'Continue · final decision'
+            : state.pendingAfterReveal === 'finale'
+              ? 'Continue · finale'
+              : 'Next question');
       main.innerHTML = `
         <div class="card">
           <h2>Prize pot · ${money(state.jackpot)}</h2>
-          <p class="muted">TV jackpot board is up.</p>
-          <button class="btn-primary big-btn" style="margin-top:0.85rem" data-act="advance">Next question</button>
+          <p class="muted">TV jackpot board is counting up.</p>
+          <div class="host-script" style="margin:0.85rem 0;padding:0.75rem 0.9rem;border-radius:12px;background:rgba(255,213,74,0.1);border:1px solid rgba(255,213,74,0.35);font-weight:700;line-height:1.4;color:var(--club-gold,#ffd54a)">
+            “${escapeHtml(snark)}”
+          </div>
+          ${
+            wipeout
+              ? `<p class="muted" style="margin:0 0 0.5rem">After this: Final Decision for the furthest contestants.</p>`
+              : ''
+          }
+          <button class="btn-primary big-btn" style="margin-top:0.5rem" data-act="advance">${nextLabel}</button>
         </div>`;
       break;
+    }
     case 'reveal':
       renderReveal();
       break;

@@ -1,4 +1,4 @@
-/** @typedef {'lobby'|'intro'|'question'|'answering'|'eliminating'|'eliminated_count'|'left_count'|'prize_pot'|'reveal'|'cashout_offer'|'final_choice'|'solo_offer'|'finale'|'game_end'} Phase */
+/** @typedef {'lobby'|'intro'|'question'|'answering'|'eliminating'|'eliminated_count'|'left_count'|'answer_reveal'|'prize_pot'|'reveal'|'cashout_offer'|'final_choice'|'solo_offer'|'finale'|'game_end'} Phase */
 /** @typedef {'active'|'out'|'cashed'|'took10k'|'winner'} PlayerStatus */
 
 export const STAKE = 1000;
@@ -45,9 +45,22 @@ export function answersMatch(given, acceptedList) {
   return (acceptedList ?? []).some((a) => normalizeAnswer(a) === n);
 }
 
+function normalizeImageTransform(t) {
+  if (!t || typeof t !== 'object') return null;
+  const scale = Number(t.scale);
+  const x = Number(t.x);
+  const y = Number(t.y);
+  if (![scale, x, y].every((n) => Number.isFinite(n))) return null;
+  return {
+    scale: Math.max(0.2, Math.min(3, scale)),
+    x: Math.max(-200, Math.min(200, x)),
+    y: Math.max(-200, Math.min(200, y)),
+  };
+}
+
 function defaultSetup() {
   return {
-    questionFile: 'sample.json',
+    questionFile: 'pack-1.json',
     answerSeconds: ANSWER_SECONDS,
     masterVolume: 0.7,
     skipIntro: false,
@@ -166,6 +179,7 @@ export function sanitizeStateForClient(state, role, playerId = null) {
   } else if (
     role !== 'host' &&
     state.phase !== 'reveal' &&
+    state.phase !== 'answer_reveal' &&
     state.phase !== 'eliminating' &&
     state.phase !== 'finale' &&
     state.phase !== 'game_end'
@@ -174,8 +188,23 @@ export function sanitizeStateForClient(state, role, playerId = null) {
       base.currentQuestion = {
         ...base.currentQuestion,
         accepted: undefined,
+        explanation: undefined,
       };
     }
+  }
+
+  if (role !== 'host' && base.currentQuestion) {
+    base.currentQuestion = {
+      ...base.currentQuestion,
+      explanation: undefined,
+    };
+  }
+
+  if (role !== 'host' && base.reveal) {
+    base.reveal = {
+      ...base.reveal,
+      explanation: undefined,
+    };
   }
 
   // Host-only preview: TV/players see percent + seats, not the prompt, until Start.
@@ -356,7 +385,9 @@ export function startGame(state, questions, packName = null) {
       percent: pct,
       prompt: q.prompt ?? q.question,
       hint: q.hint ?? null,
+      explanation: q.explanation ? String(q.explanation) : null,
       image: q.image || null,
+      imageTransform: normalizeImageTransform(q.imageTransform),
       choices,
       accepted,
     };
@@ -613,8 +644,10 @@ export function hostOverride(state, playerId, correct) {
 
   // Recalculate pending
   const survivors = players.filter((p) => p.status === 'active');
-  if (survivors.length === 0) next.pendingAfterReveal = 'game_end';
-  else if (state.questionIndex === ONE_PERCENT_INDEX) next.pendingAfterReveal = 'finale';
+  if (survivors.length === 0) {
+    next.pendingAfterReveal =
+      state.questionIndex === ONE_PERCENT_INDEX ? 'finale' : 'wipeout_final';
+  } else if (state.questionIndex === ONE_PERCENT_INDEX) next.pendingAfterReveal = 'finale';
   else if (survivors.length === 1) next.pendingAfterReveal = 'solo_offer';
   else if (state.questionIndex === FIVE_PERCENT_INDEX) next.pendingAfterReveal = 'final_choice';
   else next.pendingAfterReveal = 'next_question';
@@ -662,6 +695,10 @@ export function endAnsweringWithForces(state) {
 
     if (!correct) {
       wrongIds.push(p.id);
+      // On the 1% question, unspent $1,000 stays with the player as a bonus even if wrong.
+      if (state.questionIndex === ONE_PERCENT_INDEX && !p.stakeInJackpot) {
+        return { ...p, winnings: Math.max(p.winnings || 0, STAKE) };
+      }
       if (!p.stakeInJackpot) jackpotAdd += STAKE;
       // Stay active until the blue-light sequence reveals them
       return { ...p, stakeInJackpot: true };
@@ -669,11 +706,13 @@ export function endAnsweringWithForces(state) {
     return p;
   });
 
-  const jackpot = state.jackpot + jackpotAdd;
+  const jackpotBefore = state.jackpot;
+  const jackpot = jackpotBefore + jackpotAdd;
   const reveal = {
     percent: q.percent,
     prompt: q.prompt,
     accepted: q.accepted,
+    explanation: q.explanation || null,
     results,
     eliminated: wrongIds.length,
     survived: results.filter((r) => r.correct).length,
@@ -691,6 +730,7 @@ export function endAnsweringWithForces(state) {
       phase: 'eliminating',
       timerEndsAt: null,
       players,
+      prevJackpot: jackpotBefore,
       jackpot,
       reveal,
       pendingAfterReveal: pending,
@@ -712,7 +752,12 @@ function computePendingAfterReveal(state, wrongIds) {
     (p) => p.status === 'active' && !wrongIds.includes(p.id),
   );
   // After lighting, wrongIds will be out — compute as if already out
-  if (survivors.length === 0) return 'game_end';
+  if (survivors.length === 0) {
+    // Wipeout on 1%: no pot winners (keepers of $1k already have winnings).
+    if (state.questionIndex === ONE_PERCENT_INDEX) return 'finale';
+    // Everyone out on the same question → furthest become finalists.
+    return 'wipeout_final';
+  }
   if (state.questionIndex === ONE_PERCENT_INDEX) return 'finale';
   if (survivors.length === 1) return 'solo_offer';
   if (state.questionIndex === FIVE_PERCENT_INDEX) return 'final_choice';
@@ -811,6 +856,17 @@ export function enterLeftCount(state) {
 /** Prize pot / jackpot spectacle (show money). */
 export function enterPrizePot(state) {
   return actionMeta(cue({ ...state, phase: 'prize_pot' }, 'jackpot'), 'prize_pot');
+}
+
+/** TV board: host announced the correct answer (during/after roast). */
+export function enterRightAnswerBoard(state) {
+  if (state.phase !== 'left_count' && state.phase !== 'answer_reveal') {
+    throw new Error('Show right answer after who remains');
+  }
+  return actionMeta(
+    cue({ ...state, phase: 'answer_reveal' }, 'correct', { audience: 'all' }),
+    'show_right_answer',
+  );
 }
 
 /** Correct-answer reveal after pot (optional / legacy). */
@@ -937,16 +993,16 @@ export function finalizeElimination(state) {
 }
 
 export function advanceAfterReveal(state) {
-  // Host-driven: left (roast) → jackpot → next question
-  // Legacy eliminated_count still advances to left / end
+  // Host-driven: left (roast) → optional answer board → jackpot → next
   if (state.phase === 'eliminated_count') {
     if (state.pendingAfterReveal === 'game_end' || activePlayers(state).length === 0) {
       return continueAfterBoards(state);
     }
     return enterLeftCount(state);
   }
-  if (state.phase === 'left_count') {
-    if (state.pendingAfterReveal === 'game_end' || activePlayers(state).length === 0) {
+  if (state.phase === 'left_count' || state.phase === 'answer_reveal') {
+    // Still show the pot on wipeout (stakes just landed); only hard-end skips it.
+    if (state.pendingAfterReveal === 'game_end') {
       return continueAfterBoards(state);
     }
     return enterPrizePot(state);
@@ -969,6 +1025,9 @@ function continueAfterBoards(state) {
 
   if (pending === 'game_end') {
     return actionMeta({ ...state, phase: 'game_end', soundCue: null }, 'game_end');
+  }
+  if (pending === 'wipeout_final') {
+    return enterWipeoutFinal(state);
   }
   if (pending === 'finale') {
     let next = { ...state, phase: 'finale' };
@@ -995,6 +1054,44 @@ function continueAfterBoards(state) {
     );
   }
   return beginQuestion(state, state.questionIndex + 1);
+}
+
+/**
+ * Full wipeout — furthest-advancing contestants (everyone wrong this round)
+ * are restored as finalists and jump to the Final Decision / solo offer.
+ */
+function enterWipeoutFinal(state) {
+  const finalistIds =
+    state.elimination?.wrongIds?.length
+      ? state.elimination.wrongIds
+      : (state.reveal?.results || [])
+          .filter((r) => !r.correct && !r.usedPass)
+          .map((r) => r.playerId);
+
+  if (!finalistIds.length) {
+    return actionMeta({ ...state, phase: 'game_end', soundCue: null }, 'game_end');
+  }
+
+  const players = state.players.map((p) =>
+    finalistIds.includes(p.id) ? { ...p, status: 'active' } : p,
+  );
+  const next = {
+    ...state,
+    players,
+    pendingAfterReveal: null,
+    elimination: null,
+  };
+
+  if (finalistIds.length === 1) {
+    return actionMeta(
+      { ...next, phase: 'solo_offer', soloDecision: null },
+      'wipeout_solo',
+    );
+  }
+  return actionMeta(
+    { ...next, phase: 'final_choice', finalDecisions: {} },
+    'wipeout_final',
+  );
 }
 
 export function cashoutDecide(state, playerId, leave) {

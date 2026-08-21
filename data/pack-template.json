@@ -4,12 +4,14 @@
     {
       "percent": 90,
       "prompt": "REPLACE — easiest question",
-      "accepted": ["answer", "alternate spelling"]
+      "accepted": ["answer", "alternate spelling"],
+      "explanation": "Host-only: how to explain why the answer is right."
     },
     {
       "percent": 80,
       "prompt": "REPLACE",
-      "accepted": ["answer"]
+      "accepted": ["answer"],
+      "explanation": "Host-only tip for roasting / revealing."
     },
     {
       "percent": 70,
@@ -50,8 +52,10 @@
       "percent": 25,
       "prompt": "REPLACE — example with image + multiple choice (optional)",
       "image": "my-picture.png",
+      "imageTransform": { "scale": 1, "x": 0, "y": 0 },
       "choices": ["OPTION A", "OPTION B", "OPTION C"],
-      "accepted": ["option b", "b"]
+      "accepted": ["option b", "b"],
+      "explanation": "Optional host tip shown during the roast beat."
     },
     {
       "percent": 20,

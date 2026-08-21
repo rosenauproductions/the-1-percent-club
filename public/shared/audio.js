@@ -16,6 +16,8 @@ const DEFAULT_SOUNDS = {
 let soundFiles = { ...DEFAULT_SOUNDS };
 let masterVolume = 0.7;
 const musicTracks = new Set();
+/** Active one-shot timer bed (for early-lock seek). */
+let timerTrack = null;
 let audioActivated = false;
 let pendingSfx = null;
 const mutedPending = new Set();
@@ -143,6 +145,28 @@ export function stopAllMusic() {
     audio.currentTime = 0;
   }
   musicTracks.clear();
+  timerTrack = null;
+}
+
+/**
+ * Jump the playing timer bed to the last N seconds (everyone locked early).
+ * @param {number} [secondsFromEnd=3]
+ */
+export function seekTimerToEnd(secondsFromEnd = 3) {
+  const audio = timerTrack;
+  if (!audio) return false;
+  const fromEnd = Math.max(0.5, Number(secondsFromEnd) || 3);
+  const apply = () => {
+    const dur = audio.duration;
+    if (!Number.isFinite(dur) || dur <= 0) return false;
+    audio.currentTime = Math.max(0, dur - fromEnd);
+    return true;
+  };
+  if (audio.readyState >= 1 && Number.isFinite(audio.duration)) {
+    return apply();
+  }
+  audio.addEventListener('loadedmetadata', () => apply(), { once: true });
+  return true;
 }
 
 async function beginPlayback(audio, targetVolume, { name, loop }) {
@@ -233,6 +257,17 @@ export async function playSound(
   if (!started) return null;
 
   if (asMusic) musicTracks.add(audio);
+
+  if (name === 'timer' && !loop) {
+    timerTrack = audio;
+    audio.addEventListener(
+      'ended',
+      () => {
+        if (timerTrack === audio) timerTrack = null;
+      },
+      { once: true },
+    );
+  }
 
   if (!loop) {
     audio.addEventListener('ended', () => {

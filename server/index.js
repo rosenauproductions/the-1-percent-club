@@ -25,6 +25,8 @@ import {
   finishEliminationSting,
   finishScanningSting,
   continueElimination,
+  enterPrizePot,
+  enterRightAnswerBoard,
   advanceAfterReveal,
   ELIM_STING_MS,
   THUMP_MS,
@@ -38,6 +40,7 @@ import {
   resetToLobby,
   sanitizeStateForClient,
   activeCount,
+  lockedCount,
   createJoinCode,
   thumpGapMs,
 } from './gameState.js';
@@ -122,6 +125,22 @@ function scheduleElimStingFallback() {
 
 function nextThumpGap() {
   return thumpGapMs(state.elimination?.revealedCount ?? 0);
+}
+
+/** Everyone locked — cut remaining answer window to 3s and seek timer bed. */
+function maybeShortenTimerForAllLocked() {
+  if (state.phase !== 'answering') return;
+  const active = activeCount(state);
+  if (active < 1) return;
+  if (lockedCount(state) < active) return;
+  const ends = Date.now() + 3000;
+  if (state.timerEndsAt && state.timerEndsAt <= ends) return;
+  state = {
+    ...state,
+    timerEndsAt: ends,
+    soundCue: { name: 'timer_seek', at: Date.now(), secondsFromEnd: 3 },
+  };
+  scheduleAnswerTimer();
 }
 
 function scheduleAfterElimLight(delay = nextThumpGap()) {
@@ -299,17 +318,20 @@ async function handleAction(action, payload = {}, meta = {}) {
       clearAnswerTimer();
       state = startAnswering(state);
       state = applyTestBotAnswers(state);
+      maybeShortenTimerForAllLocked();
       scheduleAnswerTimer();
       break;
 
     case 'submit_answer':
       if (role !== 'player' && role !== 'host') throw new Error('Players only');
       state = submitAnswer(state, playerId, payload.text);
+      maybeShortenTimerForAllLocked();
       break;
 
     case 'use_pass':
       if (role !== 'player' && role !== 'host') throw new Error('Players only');
       state = usePass(state, playerId);
+      maybeShortenTimerForAllLocked();
       break;
 
     case 'end_answering':
@@ -332,6 +354,11 @@ async function handleAction(action, payload = {}, meta = {}) {
       ) {
         scheduleElimStingFallback();
       }
+      break;
+
+    case 'show_right_answer':
+      requireHost(role);
+      state = enterRightAnswerBoard(state);
       break;
 
     case 'elim_sting_done':
