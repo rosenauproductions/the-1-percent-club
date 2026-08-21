@@ -10,6 +10,8 @@ import {
   applySetup,
   joinPlayer,
   removePlayer,
+  seedTestPlayers,
+  applyTestBotAnswers,
   closeLobby,
   reopenLobby,
   startGame,
@@ -266,6 +268,11 @@ async function handleAction(action, payload = {}, meta = {}) {
       state = reopenLobby(state);
       break;
 
+    case 'seed_test_players':
+      requireHost(role);
+      state = seedTestPlayers(state);
+      break;
+
     case 'start_game': {
       requireHost(role);
       const pack = await loadQuestionPack(state.setup.questionFile);
@@ -289,7 +296,9 @@ async function handleAction(action, payload = {}, meta = {}) {
 
     case 'start_answering':
       requireHost(role);
+      clearAnswerTimer();
       state = startAnswering(state);
+      state = applyTestBotAnswers(state);
       scheduleAnswerTimer();
       break;
 

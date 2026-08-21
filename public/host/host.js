@@ -12,6 +12,12 @@ const jackpotEl = document.getElementById('jackpot');
 let state = null;
 let questionFiles = [];
 
+/** Secret test mode: /host?test=1 or tap HOST title 5× */
+const params = new URLSearchParams(location.search);
+let testMode = params.get('test') === '1' || params.get('test') === 'true';
+let hostTitleTaps = 0;
+let hostTitleTapTimer = null;
+
 function money(n) {
   return `$${Number(n || 0).toLocaleString('en-US')}`;
 }
@@ -94,6 +100,13 @@ function renderLobby() {
           Skip intro
         </label>
         <button class="btn-ghost" id="saveSetup">Save setup</button>
+        ${
+          testMode
+            ? `<button class="btn-ghost" data-act="seed_test_players" style="opacity:0.55;font-size:0.85rem">
+                Seed 5 test players
+              </button>`
+            : ''
+        }
         <button class="btn-primary big-btn" data-act="start_game" ${players.length ? '' : 'disabled'}>Start game</button>
       </div>
     </div>

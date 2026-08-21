@@ -257,6 +257,57 @@ export function joinPlayer(state, { name, playerId }) {
   };
 }
 
+const TEST_BOT_NAMES = ['John', 'Maya', 'Steve', 'Priya', 'Tom'];
+
+/** Lobby-only: seed five bot players for host testing (idempotent). */
+export function seedTestPlayers(state) {
+  if (state.phase !== 'lobby') throw new Error('Lobby only');
+  if (!state.lobbyOpen) throw new Error('Reopen lobby first');
+
+  let next = state;
+  for (const name of TEST_BOT_NAMES) {
+    const already = next.players.some(
+      (p) => p.testBot && p.name.toLowerCase() === name.toLowerCase(),
+    );
+    if (already) continue;
+    if (next.players.length >= MAX_PLAYERS) break;
+    const result = joinPlayer(next, { name });
+    next = {
+      ...result.state,
+      players: result.state.players.map((p) =>
+        p.id === result.player.id ? { ...p, testBot: true } : p,
+      ),
+    };
+  }
+  return actionMeta(next, 'seed_test_players', {
+    count: next.players.filter((p) => p.testBot).length,
+  });
+}
+
+/**
+ * Lock in answers for test bots: first bot correct (if possible), rest wrong/funny.
+ */
+export function applyTestBotAnswers(state) {
+  if (state.phase !== 'answering') return state;
+  const accepted = state.currentQuestion?.accepted || [];
+  const funny = ['fart', 'potato', 'idk', 'blue', '42', 'banana', 'my mom'];
+  let next = state;
+  const bots = next.players.filter((p) => p.testBot && p.status === 'active');
+  bots.forEach((p, i) => {
+    if (next.answers[p.id]?.locked) return;
+    const text =
+      i === 0 && accepted[0]
+        ? String(accepted[0])
+        : funny[i % funny.length];
+    try {
+      next = submitAnswer(next, p.id, text);
+    } catch {
+      // ignore
+    }
+  });
+  return next;
+}
+
 export function removePlayer(state, playerId) {
   if (state.phase !== 'lobby') throw new Error('Can only remove in lobby');
   const players = state.players
