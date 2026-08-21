@@ -711,7 +711,7 @@ export function finishScanningSting(state) {
   }
   const wrongIds = state.elimination.wrongIds || [];
   if (wrongIds.length === 0) {
-    return enterEliminatedCount({
+    return enterLeftCount({
       ...state,
       elimination: {
         ...state.elimination,
@@ -862,9 +862,10 @@ export function revealNextEliminated(state) {
   return continueElimination(state);
 }
 
+/** After outs — big "X left" board (roast happens here on host). */
 export function finalizeElimination(state) {
   const elim = state.elimination;
-  return enterEliminatedCount({
+  const next = {
     ...state,
     elimination: {
       ...elim,
@@ -874,12 +875,19 @@ export function finalizeElimination(state) {
       stingTimes: null,
       stingSound: null,
     },
-  });
+  };
+  const left = activePlayers(next).length;
+  // Skip "X eliminated" — thumps → "X left!" → host roasts
+  return actionMeta(
+    cue({ ...next, phase: 'left_count' }, 'eliminate', { audience: 'all' }),
+    'left_count',
+    { left },
+  );
 }
 
 export function advanceAfterReveal(state) {
-  // Host-driven boards: eliminated → remain → jackpot → next question
-  // If nobody left, skip remain/jackpot and end the game after the outs board.
+  // Host-driven: left (roast) → jackpot → next question
+  // Legacy eliminated_count still advances to left / end
   if (state.phase === 'eliminated_count') {
     if (state.pendingAfterReveal === 'game_end' || activePlayers(state).length === 0) {
       return continueAfterBoards(state);
@@ -898,10 +906,9 @@ export function advanceAfterReveal(state) {
   if (state.phase !== 'reveal' && state.phase !== 'eliminating') {
     throw new Error('Not in reveal');
   }
-  // If somehow still eliminating, finish first
   if (state.phase === 'eliminating') {
     state = finalizeElimination(state);
-    if (state.phase === 'eliminated_count') return state;
+    if (state.phase === 'left_count' || state.phase === 'eliminated_count') return state;
   }
   return continueAfterBoards(state);
 }

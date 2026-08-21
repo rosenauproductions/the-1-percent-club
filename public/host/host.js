@@ -368,17 +368,23 @@ function render() {
         </div>`;
       break;
     }
-    case 'left_count':
+    case 'left_count': {
+      const left = activePlayers().length;
+      const allOut =
+        state.pendingAfterReveal === 'game_end' || left === 0;
       main.innerHTML = `
         <div class="card">
-          <h2>${activePlayers().length} left!</h2>
+          <h2>${left} left!</h2>
           <p class="host-script" style="margin:0.65rem 0;font-weight:700;line-height:1.4">
-            TV is on the remain board. Now roast the wrong answers — then continue.
+            Blue lights and thumps are done. TV shows who’s left — now roast the wrong answers.
           </p>
           ${renderRoastLists()}
-          <button class="btn-primary big-btn" style="margin-top:0.85rem" data-act="advance">Done roasting · prize pot</button>
+          <button class="btn-primary big-btn" style="margin-top:0.85rem" data-act="advance">
+            ${allOut ? 'End game' : 'Done roasting · prize pot'}
+          </button>
         </div>`;
       break;
+    }
     case 'prize_pot':
       main.innerHTML = `
         <div class="card">
