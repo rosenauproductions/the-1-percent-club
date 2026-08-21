@@ -61,6 +61,46 @@
   min-width: 0;
 }
 
+.admin-settings {
+  padding: 0.75rem 0.85rem;
+  margin-bottom: 0.85rem;
+}
+
+.admin-settings h3 {
+  margin: 0 0 0.55rem;
+  font-size: 0.85rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--club-cyan);
+}
+
+.check-field {
+  display: flex;
+  gap: 0.55rem;
+  align-items: flex-start;
+  font-size: 0.92rem;
+  line-height: 1.35;
+  cursor: pointer;
+}
+
+.check-field input {
+  margin-top: 0.2rem;
+}
+
+.settings-hint {
+  margin: 0.55rem 0 0.65rem;
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.settings-hint code {
+  color: var(--club-gold);
+}
+
+.image-pair {
+  margin-bottom: 0.85rem;
+}
+
 .admin-sidebar .field {
   margin-bottom: 0.75rem;
 }

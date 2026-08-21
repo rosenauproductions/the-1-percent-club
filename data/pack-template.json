@@ -1,57 +1,79 @@
 {
   "name": "My Question Pack",
+  "settings": {
+    "hidePrompt": false
+  },
   "questions": [
     {
       "percent": 90,
       "prompt": "REPLACE — easiest question",
       "accepted": ["answer", "alternate spelling"],
-      "explanation": "Host-only: how to explain why the answer is right."
+      "explanation": "Host-only: how to explain why the answer is right.",
+      "image": "90a.png",
+      "solutionImage": "90b.png"
     },
     {
       "percent": 80,
       "prompt": "REPLACE",
       "accepted": ["answer"],
-      "explanation": "Host-only tip for roasting / revealing."
+      "explanation": "Host-only tip for roasting / revealing.",
+      "image": "80a.png",
+      "solutionImage": "80b.png"
     },
     {
       "percent": 70,
       "prompt": "REPLACE",
-      "accepted": ["answer"]
+      "accepted": ["answer"],
+      "image": "70a.png",
+      "solutionImage": "70b.png"
     },
     {
       "percent": 60,
       "prompt": "REPLACE",
-      "accepted": ["answer"]
+      "accepted": ["answer"],
+      "image": "60a.png",
+      "solutionImage": "60b.png"
     },
     {
       "percent": 50,
       "prompt": "REPLACE — passes are granted at this question",
-      "accepted": ["answer"]
+      "accepted": ["answer"],
+      "image": "50a.png",
+      "solutionImage": "50b.png"
     },
     {
       "percent": 45,
       "prompt": "REPLACE",
-      "accepted": ["answer"]
+      "accepted": ["answer"],
+      "image": "45a.png",
+      "solutionImage": "45b.png"
     },
     {
       "percent": 40,
       "prompt": "REPLACE",
-      "accepted": ["answer"]
+      "accepted": ["answer"],
+      "image": "40a.png",
+      "solutionImage": "40b.png"
     },
     {
       "percent": 35,
       "prompt": "REPLACE",
-      "accepted": ["answer"]
+      "accepted": ["answer"],
+      "image": "35a.png",
+      "solutionImage": "35b.png"
     },
     {
       "percent": 30,
       "prompt": "REPLACE — cashout is offered before this question",
-      "accepted": ["answer"]
+      "accepted": ["answer"],
+      "image": "30a.png",
+      "solutionImage": "30b.png"
     },
     {
       "percent": 25,
-      "prompt": "REPLACE — example with image + multiple choice (optional)",
-      "image": "my-picture.png",
+      "prompt": "REPLACE — set settings.hidePrompt true for image-only TV (like the real show)",
+      "image": "25a.png",
+      "solutionImage": "25b.png",
       "imageTransform": { "scale": 1, "x": 0, "y": 0 },
       "choices": ["OPTION A", "OPTION B", "OPTION C"],
       "accepted": ["option b", "b"],
@@ -60,27 +82,37 @@
     {
       "percent": 20,
       "prompt": "REPLACE",
-      "accepted": ["answer"]
+      "accepted": ["answer"],
+      "image": "20a.png",
+      "solutionImage": "20b.png"
     },
     {
       "percent": 15,
       "prompt": "REPLACE",
-      "accepted": ["answer"]
+      "accepted": ["answer"],
+      "image": "15a.png",
+      "solutionImage": "15b.png"
     },
     {
       "percent": 10,
       "prompt": "REPLACE",
-      "accepted": ["answer"]
+      "accepted": ["answer"],
+      "image": "10a.png",
+      "solutionImage": "10b.png"
     },
     {
       "percent": 5,
       "prompt": "REPLACE",
-      "accepted": ["answer"]
+      "accepted": ["answer"],
+      "image": "5a.png",
+      "solutionImage": "5b.png"
     },
     {
       "percent": 1,
       "prompt": "REPLACE — hardest / 1% question",
-      "accepted": ["answer"]
+      "accepted": ["answer"],
+      "image": "1a.png",
+      "solutionImage": "1b.png"
     }
   ]
 }

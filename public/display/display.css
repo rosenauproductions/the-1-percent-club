@@ -22,13 +22,25 @@ body.display-body {
 .display-stage__inner {
   /* 1 unit = 1% of stage width — avoids container-query size bugs */
   --u: calc(min(100vw, 100vh * 16 / 9) / 100);
+  --bezel-gold: #ffd54a;
+  --bezel-gold-hot: #ffe27a;
   position: relative;
   width: min(100vw, calc(100vh * 16 / 9));
   height: min(100vh, calc(100vw * 9 / 16));
   aspect-ratio: 16 / 9;
   overflow: hidden;
   background: radial-gradient(ellipse at 50% 30%, #0d2a6b 0%, var(--club-navy) 55%, #02040c 100%);
-  box-shadow: 0 0 0 1px rgba(46, 230, 255, 0.15);
+  border-radius: calc(1.1 * var(--u));
+  border: calc(0.5 * var(--u)) solid var(--bezel-gold);
+  /* Fluorescent gold bezel — outer glow is not clipped by overflow */
+  box-shadow:
+    0 0 0 calc(0.15 * var(--u)) rgba(255, 240, 180, 0.9),
+    0 0 calc(0.6 * var(--u)) var(--bezel-gold-hot),
+    0 0 calc(1.8 * var(--u)) rgba(255, 213, 74, 0.9),
+    0 0 calc(3.6 * var(--u)) rgba(255, 180, 40, 0.5),
+    0 0 calc(6.5 * var(--u)) rgba(255, 140, 20, 0.28),
+    inset 0 0 calc(1.4 * var(--u)) rgba(255, 213, 74, 0.2),
+    inset 0 0 calc(0.35 * var(--u)) rgba(255, 245, 200, 0.65);
   display: flex;
   flex-direction: column;
 }
@@ -626,6 +638,20 @@ body.display-body {
   margin: calc(1 * var(--u)) 0 0;
   font-size: calc(2 * var(--u));
   color: var(--text-muted);
+}
+
+.question-flow--image-only[data-image-layout='stack'] {
+  grid-template-areas:
+    "image"
+    "meta";
+}
+
+.question-flow--image-only .q-area-image {
+  max-height: none;
+}
+
+.question-flow--image-only .question-image {
+  max-height: min(58vh, 720px);
 }
 
 .elim-status {

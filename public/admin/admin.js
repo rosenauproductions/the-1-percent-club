@@ -1,14 +1,16 @@
 const PERCENTS = [90, 80, 70, 60, 50, 45, 40, 35, 30, 25, 20, 15, 10, 5, 1];
 
-/** @type {{ name: string, questions: object[] }} */
+/** @type {{ name: string, settings: { hidePrompt: boolean }, questions: object[] }} */
 let pack = blankPack();
 let selectedIndex = 0;
 let previewMode = 'question';
-/** @type {Record<number, string>} blob URLs for local image preview */
+/** @type {Record<string, string>} blob URLs keyed `${index}:q` / `${index}:s` */
 const previewBlobs = {};
 
 const els = {
   packName: document.getElementById('packName'),
+  hidePrompt: document.getElementById('hidePrompt'),
+  fillAbNames: document.getElementById('fillAbNames'),
   slotList: document.getElementById('slotList'),
   editorTitle: document.getElementById('editorTitle'),
   prompt: document.getElementById('prompt'),
@@ -17,6 +19,8 @@ const els = {
   choices: document.getElementById('choices'),
   imageName: document.getElementById('imageName'),
   imageFile: document.getElementById('imageFile'),
+  solutionImageName: document.getElementById('solutionImageName'),
+  solutionImageFile: document.getElementById('solutionImageFile'),
   loadJson: document.getElementById('loadJson'),
   newPack: document.getElementById('newPack'),
   downloadJson: document.getElementById('downloadJson'),
@@ -38,7 +42,8 @@ function blankQuestion(percent) {
     accepted: [],
     explanation: '',
     choices: [],
-    image: '',
+    image: `${percent}a.png`,
+    solutionImage: `${percent}b.png`,
     imageTransform: { scale: 1, x: 0, y: 0 },
   };
 }
@@ -46,6 +51,7 @@ function blankQuestion(percent) {
 function blankPack() {
   return {
     name: 'My Question Pack',
+    settings: { hidePrompt: false },
     questions: PERCENTS.map((p) => blankQuestion(p)),
   };
 }
@@ -85,9 +91,10 @@ function imageTransformStyle(t) {
   return `transform: translate(${t.x}%, ${t.y}%) scale(${t.scale}); transform-origin: center center;`;
 }
 
-function imageSrcFor(q, index) {
-  if (previewBlobs[index]) return previewBlobs[index];
-  const name = String(q.image || '').trim();
+function imageSrc(kind, q, index) {
+  const key = `${index}:${kind}`;
+  if (previewBlobs[key]) return previewBlobs[key];
+  const name = String(kind === 's' ? q.solutionImage || q.image : q.image || '').trim();
   if (!name) return '';
   if (name.startsWith('/') || name.startsWith('http')) return name;
   const folder = slugFromPackName(pack.name);
@@ -101,6 +108,13 @@ function slugFromPackName(name) {
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '');
   return base || 'pack';
+}
+
+function clearPreviewBlobs() {
+  Object.keys(previewBlobs).forEach((k) => {
+    URL.revokeObjectURL(previewBlobs[k]);
+    delete previewBlobs[k];
+  });
 }
 
 function renderSlots() {
@@ -118,14 +132,16 @@ function renderSlots() {
 function renderImageReminder() {
   const names = [
     ...new Set(
-      pack.questions
-        .map((q) => String(q.image || '').trim())
-        .filter((n) => n && !n.startsWith('/') && !n.startsWith('http')),
+      pack.questions.flatMap((q) =>
+        [q.image, q.solutionImage]
+          .map((n) => String(n || '').trim())
+          .filter((n) => n && !n.startsWith('/') && !n.startsWith('http')),
+      ),
     ),
   ];
   if (!names.length) {
     els.imageReminder.textContent =
-      'No image filenames yet. When you download, zip matching files under public/images/questions/<pack>/';
+      'No image filenames yet. Zip matching files under public/images/questions/<pack>/';
     return;
   }
   els.imageReminder.innerHTML = `<strong>Zip these with the pack:</strong><br>${names
@@ -137,12 +153,14 @@ function fillEditor() {
   const q = currentQ();
   const t = ensureTransform(q);
   els.packName.value = pack.name || '';
+  els.hidePrompt.checked = !!pack.settings?.hidePrompt;
   els.editorTitle.textContent = `${q.percent}% question`;
   els.prompt.value = q.prompt || '';
   els.accepted.value = Array.isArray(q.accepted) ? q.accepted.join('\n') : '';
   els.explanation.value = q.explanation || '';
   els.choices.value = Array.isArray(q.choices) ? q.choices.join('\n') : '';
   els.imageName.value = q.image || '';
+  els.solutionImageName.value = q.solutionImage || '';
   els.scale.value = String(t.scale);
   els.x.value = String(t.x);
   els.y.value = String(t.y);
@@ -154,11 +172,13 @@ function fillEditor() {
 function readEditorIntoPack() {
   const q = currentQ();
   pack.name = els.packName.value.trim() || 'My Question Pack';
+  pack.settings = { hidePrompt: !!els.hidePrompt.checked };
   q.prompt = els.prompt.value;
   q.accepted = parseList(els.accepted.value);
   q.explanation = els.explanation.value.trim();
   q.choices = parseList(els.choices.value);
   q.image = els.imageName.value.trim();
+  q.solutionImage = els.solutionImageName.value.trim();
   q.imageTransform = {
     scale: Number(els.scale.value),
     x: Number(els.x.value),
@@ -179,9 +199,10 @@ function renderChoices(choices) {
 function renderPreview() {
   const q = currentQ();
   const t = ensureTransform(q);
-  const src = imageSrcFor(q, selectedIndex);
-  const hasImage = Boolean(src);
-  const hasChoices = Array.isArray(q.choices) && q.choices.length > 0;
+  const imageOnly = !!pack.settings?.hidePrompt;
+  const qSrc = imageSrc('q', q, selectedIndex);
+  const sSrc = imageSrc('s', q, selectedIndex) || qSrc;
+  const hasChoices = !imageOnly && Array.isArray(q.choices) && q.choices.length > 0;
   const accepted = (q.accepted || []).slice(0, 3).join(' / ') || '—';
 
   if (previewMode === 'answer') {
@@ -189,8 +210,8 @@ function renderPreview() {
       <div class="reveal-layout reveal-layout--answer-only">
         <div class="pct-badge" style="align-self:center">${q.percent}%</div>
         ${
-          hasImage
-            ? `<div class="question-image-wrap question-image-wrap--reveal"><img class="question-image" src="${escapeHtml(src)}" alt="" style="${imageTransformStyle(t)}" /></div>`
+          sSrc
+            ? `<div class="question-image-wrap question-image-wrap--reveal"><img class="question-image" src="${escapeHtml(sSrc)}" alt="" style="${imageTransformStyle(t)}" /></div>`
             : ''
         }
         <div class="answer-banner">
@@ -205,11 +226,11 @@ function renderPreview() {
     <div class="question-layout">
       <div class="question-panel">
         <div class="pct-badge">${q.percent}%<small>OF PEOPLE GOT THIS RIGHT</small></div>
-        <div class="question-flow ${hasImage ? 'question-flow--has-image' : ''}" data-image-layout="stack">
-          <p class="prompt q-area-prompt">${escapeHtml(q.prompt || 'Prompt…')}</p>
+        <div class="question-flow ${qSrc ? 'question-flow--has-image' : ''} ${imageOnly ? 'question-flow--image-only' : ''}" data-image-layout="stack">
+          ${imageOnly ? '' : `<p class="prompt q-area-prompt">${escapeHtml(q.prompt || 'Prompt…')}</p>`}
           ${
-            hasImage
-              ? `<div class="question-image-wrap q-area-image"><img class="question-image" src="${escapeHtml(src)}" alt="" style="${imageTransformStyle(t)}" /></div>`
+            qSrc
+              ? `<div class="question-image-wrap q-area-image"><img class="question-image" src="${escapeHtml(qSrc)}" alt="" style="${imageTransformStyle(t)}" /></div>`
               : ''
           }
           ${hasChoices ? `<div class="q-area-choices">${renderChoices(q.choices)}</div>` : '<div class="q-area-choices"></div>'}
@@ -235,14 +256,25 @@ function selectIndex(i) {
   refresh();
 }
 
+function normalizeTransform(t) {
+  if (!t || typeof t !== 'object') return { scale: 1, x: 0, y: 0 };
+  return {
+    scale: Number.isFinite(Number(t.scale)) ? Number(t.scale) : 1,
+    x: Number.isFinite(Number(t.x)) ? Number(t.x) : 0,
+    y: Number.isFinite(Number(t.y)) ? Number(t.y) : 0,
+  };
+}
+
 function normalizeLoaded(raw) {
   let name = 'My Question Pack';
   let list = [];
+  let hidePrompt = false;
   if (Array.isArray(raw)) {
     list = raw;
   } else if (raw && typeof raw === 'object') {
     name = raw.name || name;
     list = raw.questions || [];
+    hidePrompt = !!(raw.settings?.hidePrompt || raw.hidePrompt);
   }
   const byPercent = new Map();
   for (const q of list) {
@@ -251,6 +283,7 @@ function normalizeLoaded(raw) {
   }
   return {
     name,
+    settings: { hidePrompt },
     questions: PERCENTS.map((percent) => {
       const src = byPercent.get(percent) || blankQuestion(percent);
       const q = blankQuestion(percent);
@@ -264,19 +297,13 @@ function normalizeLoaded(raw) {
             : [];
       q.explanation = src.explanation ? String(src.explanation) : '';
       q.choices = Array.isArray(src.choices) ? src.choices.map(String) : [];
-      q.image = src.image ? String(src.image) : '';
+      q.image = src.image ? String(src.image) : `${percent}a.png`;
+      q.solutionImage = src.solutionImage
+        ? String(src.solutionImage)
+        : `${percent}b.png`;
       q.imageTransform = normalizeTransform(src.imageTransform);
       return q;
     }),
-  };
-}
-
-function normalizeTransform(t) {
-  if (!t || typeof t !== 'object') return { scale: 1, x: 0, y: 0 };
-  return {
-    scale: Number.isFinite(Number(t.scale)) ? Number(t.scale) : 1,
-    x: Number.isFinite(Number(t.x)) ? Number(t.x) : 0,
-    y: Number.isFinite(Number(t.y)) ? Number(t.y) : 0,
   };
 }
 
@@ -284,6 +311,7 @@ function exportPack() {
   readEditorIntoPack();
   return {
     name: pack.name,
+    settings: { hidePrompt: !!pack.settings?.hidePrompt },
     questions: pack.questions.map((q) => {
       const out = {
         percent: q.percent,
@@ -292,12 +320,11 @@ function exportPack() {
       };
       if (q.explanation) out.explanation = q.explanation;
       if (q.choices?.length) out.choices = q.choices;
-      if (q.image) {
-        out.image = q.image;
-        const t = ensureTransform(q);
-        if (t.scale !== 1 || t.x !== 0 || t.y !== 0) {
-          out.imageTransform = { scale: t.scale, x: t.x, y: t.y };
-        }
+      if (q.image) out.image = q.image;
+      if (q.solutionImage) out.solutionImage = q.solutionImage;
+      const t = ensureTransform(q);
+      if (t.scale !== 1 || t.x !== 0 || t.y !== 0) {
+        out.imageTransform = { scale: t.scale, x: t.x, y: t.y };
       }
       return out;
     }),
@@ -316,6 +343,7 @@ els.slotList.addEventListener('click', (e) => {
   els.explanation,
   els.choices,
   els.imageName,
+  els.solutionImageName,
   els.packName,
 ].forEach((el) => {
   el.addEventListener('input', () => {
@@ -324,6 +352,20 @@ els.slotList.addEventListener('click', (e) => {
     renderPreview();
     renderImageReminder();
   });
+});
+
+els.hidePrompt.addEventListener('change', () => {
+  readEditorIntoPack();
+  renderPreview();
+});
+
+els.fillAbNames.addEventListener('click', () => {
+  readEditorIntoPack();
+  for (const q of pack.questions) {
+    q.image = `${q.percent}a.png`;
+    q.solutionImage = `${q.percent}b.png`;
+  }
+  refresh();
 });
 
 function onTransformInput() {
@@ -343,29 +385,30 @@ els.resetTransform.addEventListener('click', () => {
   onTransformInput();
 });
 
-els.imageFile.addEventListener('change', () => {
-  const file = els.imageFile.files?.[0];
-  if (!file) return;
-  if (previewBlobs[selectedIndex]) URL.revokeObjectURL(previewBlobs[selectedIndex]);
-  previewBlobs[selectedIndex] = URL.createObjectURL(file);
-  if (!els.imageName.value.trim()) {
-    els.imageName.value = file.name;
-  }
-  readEditorIntoPack();
-  renderPreview();
-  renderImageReminder();
-});
+function bindImagePicker(input, kind, nameEl) {
+  input.addEventListener('change', () => {
+    const file = input.files?.[0];
+    if (!file) return;
+    const key = `${selectedIndex}:${kind}`;
+    if (previewBlobs[key]) URL.revokeObjectURL(previewBlobs[key]);
+    previewBlobs[key] = URL.createObjectURL(file);
+    if (!nameEl.value.trim()) nameEl.value = file.name;
+    readEditorIntoPack();
+    renderPreview();
+    renderImageReminder();
+  });
+}
+
+bindImagePicker(els.imageFile, 'q', els.imageName);
+bindImagePicker(els.solutionImageFile, 's', els.solutionImageName);
 
 els.loadJson.addEventListener('change', async () => {
   const file = els.loadJson.files?.[0];
   if (!file) return;
   try {
     const text = await file.text();
+    clearPreviewBlobs();
     pack = normalizeLoaded(JSON.parse(text));
-    Object.keys(previewBlobs).forEach((k) => {
-      URL.revokeObjectURL(previewBlobs[k]);
-      delete previewBlobs[k];
-    });
     selectedIndex = 0;
     refresh();
   } catch (err) {
@@ -376,10 +419,7 @@ els.loadJson.addEventListener('change', async () => {
 
 els.newPack.addEventListener('click', () => {
   if (!confirm('Start a blank 15-slot pack? Unsaved edits will be lost.')) return;
-  Object.keys(previewBlobs).forEach((k) => {
-    URL.revokeObjectURL(previewBlobs[k]);
-    delete previewBlobs[k];
-  });
+  clearPreviewBlobs();
   pack = blankPack();
   selectedIndex = 0;
   refresh();

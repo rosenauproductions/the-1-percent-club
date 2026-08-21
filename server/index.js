@@ -226,9 +226,13 @@ async function loadQuestionPack(filename) {
   const questions = list.map((q) => ({
     ...q,
     image: resolveQuestionImage(q.image, packId),
+    solutionImage: resolveQuestionImage(q.solutionImage, packId),
   }));
   const name = Array.isArray(data) ? packId : (data.name ?? safe);
-  return { questions, name, packId };
+  const settings = {
+    hidePrompt: !!(data && !Array.isArray(data) && data.settings?.hidePrompt),
+  };
+  return { questions, name, packId, settings };
 }
 
 /** Pack-relative image → /images/questions/<packId>/<file> */
@@ -295,7 +299,7 @@ async function handleAction(action, payload = {}, meta = {}) {
     case 'start_game': {
       requireHost(role);
       const pack = await loadQuestionPack(state.setup.questionFile);
-      state = startGame(state, pack.questions, pack.name);
+      state = startGame(state, pack.questions, pack.name, pack.settings);
       break;
     }
 

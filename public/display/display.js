@@ -181,12 +181,14 @@ function renderQuestion() {
   const active = state.players.filter((p) => p.status === 'active');
   const locked = Object.values(state.answers || {}).filter((a) => a.locked).length;
   const answering = state.phase === 'answering';
-  const promptHidden = !answering && (!!q?.promptHidden || !q?.prompt);
-  const hasImage = !!q?.image && !promptHidden;
-  const hasChoices = !promptHidden && Array.isArray(q?.choices) && q.choices.length > 0;
+  const hostHold = !answering && (!!q?.promptHidden || !q?.prompt);
+  const imageOnly = !!q?.hidePrompt;
+  const hasImage = !!q?.image && !hostHold;
+  const hasChoices =
+    !hostHold && !imageOnly && Array.isArray(q?.choices) && q.choices.length > 0;
 
   // Host talk beat — brand mark only until Start reveals the question.
-  if (promptHidden) {
+  if (hostHold) {
     main.innerHTML = `
       <div class="question-layout">
         <div class="question-panel host-hold">
@@ -202,8 +204,12 @@ function renderQuestion() {
     <div class="question-layout">
       <div class="question-panel" id="questionPanel">
         <div class="pct-badge">${q?.percent ?? '?'}%<small>OF PEOPLE GOT THIS RIGHT</small></div>
-        <div class="question-flow ${hasImage ? 'question-flow--has-image' : ''}" data-image-layout="stack">
-          <p class="prompt q-area-prompt">${escapeHtml(q?.prompt ?? '')}</p>
+        <div class="question-flow ${hasImage ? 'question-flow--has-image' : ''} ${imageOnly ? 'question-flow--image-only' : ''}" data-image-layout="stack">
+          ${
+            imageOnly
+              ? ''
+              : `<p class="prompt q-area-prompt">${escapeHtml(q?.prompt ?? '')}</p>`
+          }
           ${
             hasImage
               ? `<div class="question-image-wrap q-area-image"><img class="question-image" src="${escapeHtml(q.image)}" alt="" style="${imageTransformStyle(q.imageTransform)}" /></div>`
@@ -268,8 +274,10 @@ function renderEliminating() {
   const scanning = elim.stage === 'scanning';
   const sting = elim.stage === 'sting' || scanning;
   const q = state.currentQuestion;
+  const imageOnly = !!q?.hidePrompt;
   const hasImage = !!q?.image;
-  const hasChoices = Array.isArray(q?.choices) && q.choices.length > 0;
+  const hasChoices =
+    !imageOnly && Array.isArray(q?.choices) && q.choices.length > 0;
   const outCount = elim.revealedCount || 0;
   const leftCount = state.players.filter((p) => p.status === 'active').length;
   const showTally = !pending && !scanning && outCount > 0;
@@ -283,8 +291,12 @@ function renderEliminating() {
     <div class="question-layout question-layout--elim">
       <div class="question-panel" id="questionPanel">
         <div class="pct-badge">${q?.percent ?? '?'}%<small>OF PEOPLE GOT THIS RIGHT</small></div>
-        <div class="question-flow ${hasImage ? 'question-flow--has-image' : ''}" data-image-layout="stack">
-          <p class="prompt q-area-prompt">${escapeHtml(q?.prompt ?? '')}</p>
+        <div class="question-flow ${hasImage ? 'question-flow--has-image' : ''} ${imageOnly ? 'question-flow--image-only' : ''}" data-image-layout="stack">
+          ${
+            imageOnly
+              ? ''
+              : `<p class="prompt q-area-prompt">${escapeHtml(q?.prompt ?? '')}</p>`
+          }
           ${
             hasImage
               ? `<div class="question-image-wrap q-area-image"><img class="question-image" src="${escapeHtml(q.image)}" alt="" style="${imageTransformStyle(q.imageTransform)}" /></div>`
@@ -380,12 +392,16 @@ function renderAnswerReveal() {
   const r = state.reveal;
   const accepted = (r?.accepted || []).slice(0, 3).join(' / ');
   const q = state.currentQuestion;
+  const solutionSrc = q?.solutionImage || q?.image;
+  const solutionTransform = q?.solutionImage
+    ? q.solutionImageTransform || q.imageTransform
+    : q?.imageTransform;
   main.innerHTML = `
     <div class="reveal-layout reveal-layout--answer-only">
       <div class="pct-badge" style="align-self:center">${r?.percent ?? '?'}%</div>
       ${
-        q?.image
-          ? `<div class="question-image-wrap question-image-wrap--reveal"><img class="question-image" src="${escapeHtml(q.image)}" alt="" style="${imageTransformStyle(q.imageTransform)}" /></div>`
+        solutionSrc
+          ? `<div class="question-image-wrap question-image-wrap--reveal"><img class="question-image" src="${escapeHtml(solutionSrc)}" alt="" style="${imageTransformStyle(solutionTransform)}" /></div>`
           : ''
       }
       <div class="answer-banner">

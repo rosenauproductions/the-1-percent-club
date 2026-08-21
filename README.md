@@ -113,11 +113,24 @@ Optional `"choices": ["A text", "B text", …]` draws A/B/C tiles on the TV. Pla
 
 Optional `"explanation": "…"` is host-only (shown during the roast beat before **Show right answer**).
 
+Optional pack `"settings": { "hidePrompt": true }` hides the prompt text on TV (image-only boards — host still sees the full text). Per-question `"hidePrompt"` overrides the pack default.
+
+Image pairs (recommended for image-heavy packs):
+
+```
+"image": "90a.png",
+"solutionImage": "90b.png"
+```
+
+`image` shows while answering / blue lights; `solutionImage` shows on **Show right answer** (falls back to `image` if omitted).
+
 Optional `"imageTransform": { "scale": 1, "x": 0, "y": 0 }` nudges the TV image (use `/admin` to preview).
 
 - Relative names resolve to `/images/questions/<packName>/…`
 - Or use a full path: `"image": "/images/questions/pack-1/owl-worm.png"`
 - Omit `image` / `choices` for plain text questions
+
+Example image pack: `data/questions/split-decision.json` → images in `public/images/questions/split-decision/` (`90a.png` / `90b.png`, …).
 
 Start from `data/pack-template.json`, or edit packs in the local **`/admin`** editor and download JSON.
 

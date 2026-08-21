@@ -1,0 +1,128 @@
+{
+  "name": "Split Decision",
+  "settings": {
+    "hidePrompt": true
+  },
+  "questions": [
+    {
+      "percent": 90,
+      "prompt": "Logically, based solely on their names, which celebrity belongs on this guest list? (Doja Cat, Megan Fox, Sheryl Crow…)",
+      "accepted": ["Bad Bunny", "bad bunny", "BadBunny", "badbunny", "Bad bunny"],
+      "explanation": "It's a list of celebrities whose second/last name is an animal.",
+      "image": "90a.png",
+      "solutionImage": "90b.png"
+    },
+    {
+      "percent": 80,
+      "prompt": "Which pizza has more slices – an 18″ one or a 12″ one?",
+      "accepted": ["12", "12 inch", "12\"", "12-inch", "rectangular", "the rectangular one", "the smaller one", "12 inch rectangular"],
+      "explanation": "The rectangular pizza has 7 large slices + 4 smaller ones = 11 total. The round one only has 8.",
+      "image": "80a.png",
+      "solutionImage": "80b.png"
+    },
+    {
+      "percent": 70,
+      "prompt": "These triplets like to wear similar clothing but with subtle differences so people can tell them apart. Which triplet is wearing this exact outfit?",
+      "accepted": ["B", "b", "option B", "the middle one"],
+      "explanation": "In A the scarf is different colors. In C the scarf fringe is much shorter and the sweater cuffs are a different color.",
+      "image": "70a.png",
+      "solutionImage": "70b.png"
+    },
+    {
+      "percent": 60,
+      "prompt": "What are the 2 words on this sign that are hidden by trees?",
+      "accepted": ["Public Storage", "public storage", "PublicStorage", "PUBLIC STORAGE"],
+      "explanation": "The sign actually says Public Storage.",
+      "image": "60a.png",
+      "solutionImage": "60b.png"
+    },
+    {
+      "percent": 50,
+      "prompt": "Gail’s alarm company requires her to use a 10-character password & no characters can be duplicated. Which of these is an acceptable password?",
+      "accepted": ["B", "b", "option B"],
+      "explanation": "A repeats the letter E. C is only 9 characters and repeats the asterisk. D is only 9 characters.",
+      "image": "50a.png",
+      "solutionImage": "50b.png"
+    },
+    {
+      "percent": 45,
+      "prompt": "Ana, Gina & James are each standing on a different step. If Ana is 2 steps higher than Gina & Gina is 1 step below James, which person is tallest?",
+      "accepted": ["Gina", "gina", "GINA"],
+      "explanation": "Gina is standing on the lowest step, so she must be the tallest.",
+      "image": "45a.png",
+      "solutionImage": "45b.png"
+    },
+    {
+      "percent": 40,
+      "prompt": "How many different colors make up the 9 colored squares seen here?",
+      "accepted": ["6", "six", "Six"],
+      "explanation": "The colors are red, blue, green, yellow, orange, and purple.",
+      "image": "40a.png",
+      "solutionImage": "40b.png"
+    },
+    {
+      "percent": 35,
+      "prompt": "In this picture, the later a letter occurs in the alphabet, the larger in size it should be. Which letter is the wrong size?",
+      "accepted": ["P", "p"],
+      "explanation": "P comes after N, so it should be larger than the N and smaller than the R.",
+      "image": "35a.png",
+      "solutionImage": "35b.png"
+    },
+    {
+      "percent": 30,
+      "prompt": "There are three 3’s and three 4’s on this wheel. If you spin it twice, what percent chance do you have of getting a total of 7?",
+      "accepted": ["50", "50%", "fifty", "50 percent", "1/2", "50/100"],
+      "explanation": "Four possible outcomes (3+3, 4+4, 3+4, 4+3). Two of them add to 7 → 50%.",
+      "image": "30a.png",
+      "solutionImage": "30b.png"
+    },
+    {
+      "percent": 25,
+      "prompt": "Given Shannon Stroff’s list of opposites (twin/close, fin/spout & piano/bullseyes), which set of words should come next?",
+      "accepted": ["A", "a", "option A"],
+      "explanation": "Each word pair hides a pair of opposites. Even Shannon Stroff’s name follows the pattern.",
+      "image": "25a.png",
+      "solutionImage": "25b.png"
+    },
+    {
+      "percent": 20,
+      "prompt": "3 gleeps equal 1 glop. 2 glops equal 1 gloop. How many gleeps will it take to balance this scale?",
+      "accepted": ["9", "nine", "Nine"],
+      "explanation": "1 Glop = 3 Gleeps → 1 Gloop = 6 Gleeps → need 9 Gleeps to balance.",
+      "image": "20a.png",
+      "solutionImage": "20b.png"
+    },
+    {
+      "percent": 15,
+      "prompt": "What animal do you get if you draw lines between the dots in order?",
+      "accepted": ["Elephant", "elephant", "ELEPHANT", "an elephant"],
+      "explanation": "Connecting the dots in order forms an elephant.",
+      "image": "15a.png",
+      "solutionImage": "15b.png"
+    },
+    {
+      "percent": 10,
+      "prompt": "What word that describes a sound (which sounds like a booby prize on “Treasure Hunt”) do you get from putting together the silent letters from: indicted, halfway, guard, autumn & knuckle?",
+      "accepted": ["Clunk", "clunk", "CLUNK"],
+      "explanation": "Silent letters: C (indicted), L (halfway), U (guard), N (autumn), K (knuckle) → CLUNK.",
+      "image": "10a.png",
+      "solutionImage": "10b.png"
+    },
+    {
+      "percent": 5,
+      "prompt": "When counting down from 100, what’s the 1st number you’ll say that’s not part of another number whose name has exactly 1 syllable?",
+      "accepted": ["12", "twelve", "Twelve"],
+      "explanation": "Every other number from 100 down to 13 has at least two syllables.",
+      "image": "5a.png",
+      "solutionImage": "5b.png"
+    },
+    {
+      "percent": 1,
+      "prompt": "Surprisingly, there’s only 1 word in the English language that can be made when you fill in these blanks (_NPR___C__B__) so that the finished word contains no repeated letters. What’s that word?",
+      "accepted": ["Unpredictably", "unpredictably", "UNPREDICTABLY"],
+      "explanation": "“Unpredictable” is wrong because it repeats the letter E.",
+      "image": "1a.png",
+      "solutionImage": "1b.png"
+    }
+  ]
+}

@@ -30,6 +30,20 @@
         <span>Pack name</span>
         <input type="text" id="packName" placeholder="My Question Pack" />
       </label>
+
+      <div class="admin-settings card">
+        <h3>Settings</h3>
+        <label class="check-field">
+          <input type="checkbox" id="hidePrompt" />
+          <span>Hide question text on TV — image only</span>
+        </label>
+        <p class="muted settings-hint">
+          Host still sees the full prompt. Use <code>90a</code> / <code>90b</code> image pairs
+          (question / solution).
+        </p>
+        <button type="button" class="btn-ghost" id="fillAbNames">Fill Na / Nb filenames</button>
+      </div>
+
       <div class="slot-list" id="slotList"></div>
       <div class="image-reminder muted" id="imageReminder"></div>
     </aside>
@@ -37,7 +51,7 @@
     <section class="admin-editor card">
       <h2 id="editorTitle">Question</h2>
       <label class="field">
-        <span>Prompt</span>
+        <span>Prompt <span class="muted">(host always sees this)</span></span>
         <textarea id="prompt" rows="4"></textarea>
       </label>
       <label class="field">
@@ -52,16 +66,30 @@
         <span>Choices <span class="muted">(optional, one per line → A/B/C…)</span></span>
         <textarea id="choices" rows="3"></textarea>
       </label>
-      <div class="field-row">
-        <label class="field grow">
-          <span>Image filename</span>
-          <input type="text" id="imageName" placeholder="owl-worm.png" />
-        </label>
-        <label class="btn-ghost file-btn field-file">
-          Preview image
-          <input type="file" id="imageFile" accept="image/*" hidden />
-        </label>
+
+      <div class="image-pair">
+        <div class="field-row">
+          <label class="field grow">
+            <span>Question image <span class="muted">(e.g. 90a.png)</span></span>
+            <input type="text" id="imageName" placeholder="90a.png" />
+          </label>
+          <label class="btn-ghost file-btn field-file">
+            Preview A
+            <input type="file" id="imageFile" accept="image/*" hidden />
+          </label>
+        </div>
+        <div class="field-row">
+          <label class="field grow">
+            <span>Solution image <span class="muted">(e.g. 90b.png)</span></span>
+            <input type="text" id="solutionImageName" placeholder="90b.png" />
+          </label>
+          <label class="btn-ghost file-btn field-file">
+            Preview B
+            <input type="file" id="solutionImageFile" accept="image/*" hidden />
+          </label>
+        </div>
       </div>
+
       <div class="transform-grid" id="transformPanel">
         <label class="field">
           <span>Scale <span id="scaleVal">1.00</span></span>

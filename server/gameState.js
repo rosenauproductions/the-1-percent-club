@@ -106,6 +106,7 @@ export function createInitialState() {
     questionIndex: -1,
     questions: [],
     packName: null,
+    packSettings: { hidePrompt: false },
     currentQuestion: null,
     timerEndsAt: null,
     answeringStartedAt: null,
@@ -355,11 +356,15 @@ export function reopenLobby(state) {
   return { ...state, lobbyOpen: true };
 }
 
-export function startGame(state, questions, packName = null) {
+export function startGame(state, questions, packName = null, packSettings = null) {
   if (state.players.length < 1) throw new Error('Need at least 1 player');
   if (!Array.isArray(questions) || questions.length < PERCENTAGES.length) {
     throw new Error(`Need ${PERCENTAGES.length} questions in pack`);
   }
+
+  const settings = {
+    hidePrompt: !!(packSettings?.hidePrompt),
+  };
 
   const packed = PERCENTAGES.map((pct, i) => {
     const q = questions[i];
@@ -386,8 +391,11 @@ export function startGame(state, questions, packName = null) {
       prompt: q.prompt ?? q.question,
       hint: q.hint ?? null,
       explanation: q.explanation ? String(q.explanation) : null,
+      hidePrompt: q.hidePrompt != null ? !!q.hidePrompt : settings.hidePrompt,
       image: q.image || null,
+      solutionImage: q.solutionImage || null,
       imageTransform: normalizeImageTransform(q.imageTransform),
+      solutionImageTransform: normalizeImageTransform(q.solutionImageTransform),
       choices,
       accepted,
     };
@@ -398,6 +406,7 @@ export function startGame(state, questions, packName = null) {
     lobbyOpen: false,
     questions: packed,
     packName,
+    packSettings: settings,
     jackpot: 0,
     questionIndex: -1,
     currentQuestion: null,
