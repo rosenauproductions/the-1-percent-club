@@ -196,15 +196,18 @@ async function loadQuestionPack(filename) {
   const filePath = path.join(QUESTIONS_DIR, safe);
   const raw = await fs.readFile(filePath, 'utf8');
   const data = JSON.parse(raw);
-  if (!Array.isArray(data.questions)) {
+  // Support { name, questions: [...] } or a bare questions array
+  const list = Array.isArray(data) ? data : data.questions;
+  if (!Array.isArray(list)) {
     throw new Error('Invalid question pack: missing questions array');
   }
   const packId = path.basename(safe, '.json');
-  const questions = data.questions.map((q) => ({
+  const questions = list.map((q) => ({
     ...q,
     image: resolveQuestionImage(q.image, packId),
   }));
-  return { questions, name: data.name ?? safe, packId };
+  const name = Array.isArray(data) ? packId : (data.name ?? safe);
+  return { questions, name, packId };
 }
 
 /** Pack-relative image → /images/questions/<packId>/<file> */

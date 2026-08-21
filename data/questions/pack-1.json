@@ -1,0 +1,184 @@
+{
+  "name": "1% Pack 1",
+  "questions": [
+    {
+      "percent": 90,
+      "prompt": "What is the yesterday of tomorrow and the tomorrow of yesterday?",
+      "accepted": [
+        "today",
+        "Today",
+        "to day",
+        "the day",
+        "this day"
+      ]
+    },
+    {
+      "percent": 80,
+      "prompt": "What type of meat can be found in the word SHAMPOO?",
+      "accepted": [
+        "ham",
+        "HAM",
+        "h am",
+        "ha m"
+      ]
+    },
+    {
+      "percent": 70,
+      "prompt": "If a young cat is written as KTTN, how would a young dog be written?",
+      "accepted": [
+        "PPPY",
+        "pppy",
+        "P P P Y",
+        "puppy without vowels",
+        "puppy"
+      ]
+    },
+    {
+      "percent": 60,
+      "prompt": "Which of these is NOT an anagram of a colour? SLIVER, LUBE, GENRE, RIPPLE",
+      "accepted": [
+        "RIPPLE",
+        "ripple",
+        "Ripple",
+        "r i p p l e"
+      ]
+    },
+    {
+      "percent": 50,
+      "prompt": "Gloria is playing a game of two truths and one lie. Which statement is the lie?\nA) I was born when my parents’ ages both contained the numbers 2 and 3\nB) When I turned 18, my mother was 50 and my father was 41\nC) My parents were both born on 29th February, 11 years apart",
+      "accepted": [
+        "C",
+        "c",
+        "C)",
+        "My parents were both born on 29th February, 11 years apart",
+        "the third one",
+        "statement c",
+        "lie is c",
+        "c is the lie"
+      ]
+    },
+    {
+      "percent": 45,
+      "prompt": "What single letter replaces the question marks to create three real words?\n?AYA?\n?IOS?\n?NOC?",
+      "accepted": [
+        "K",
+        "k",
+        "kay",
+        "the letter k"
+      ]
+    },
+    {
+      "percent": 40,
+      "prompt": "Edna’s birthday is on the sixth of April and Jen’s birthday falls on the 15th of October, therefore Amir’s birthday must be the ‘?’ of January.",
+      "accepted": [
+        "24th",
+        "24",
+        "twenty-fourth",
+        "twenty fourth",
+        "twenty fourth",
+        "24th of january",
+        "the 24th"
+      ]
+    },
+    {
+      "percent": 35,
+      "prompt": "What four-letter word replaces the missing part of this sentence? ‘Mr Owl ate my metal ____’",
+      "accepted": [
+        "worm",
+        "WORM",
+        "w orm",
+        "the worm"
+      ],
+      "image": "owl-worm.png"
+    },
+    {
+      "percent": 30,
+      "prompt": "Which of these would it be impossible to do?\nA) Marry your cousin’s cousin\nB) Marry your brother’s widow\nC) Marry your widow’s sister",
+      "accepted": [
+        "C",
+        "c",
+        "C)",
+        "Marry your widow’s sister",
+        "marry your widow's sister",
+        "marry your widows sister",
+        "the third one",
+        "statement c",
+        "c is impossible"
+      ]
+    },
+    {
+      "percent": 25,
+      "prompt": "What is the first number in English that, when spelled out, has its letters in alphabetical order?",
+      "accepted": [
+        "40",
+        "forty",
+        "FORTY",
+        "fourty",
+        "Fourty",
+        "40th",
+        "the number 40"
+      ]
+    },
+    {
+      "percent": 20,
+      "prompt": "Jamaica + Japan = 124\nArgentina + Armenia = 1245\nFrance + Brazil = 23\nEngland + Germany = ?",
+      "accepted": [
+        "56",
+        "fifty-six",
+        "fifty six",
+        "fifty six",
+        "5 6",
+        "fifty-six"
+      ]
+    },
+    {
+      "percent": 15,
+      "prompt": "Last month was not May or July. Next month is not January, March, or November. Neither last month nor next month is April, August, or December. What month must it be?",
+      "accepted": [
+        "April",
+        "april",
+        "APRIL",
+        "apr",
+        "the month of april"
+      ]
+    },
+    {
+      "percent": 10,
+      "prompt": "What four-word phrase can you get if you keep everything below, but remove “two letters” in order?\nT I W O A M L A W E T I N T E N R E S R",
+      "accepted": [
+        "I AM A WINNER",
+        "i am a winner",
+        "I am a winner",
+        "iam a winner",
+        "iama winner",
+        "i am awinner"
+      ]
+    },
+    {
+      "percent": 5,
+      "prompt": "What letter completes this sequence?\nS M H D W M ?",
+      "accepted": [
+        "Y",
+        "y",
+        "year",
+        "years",
+        "Y for year",
+        "y for years"
+      ],
+      "image": "time-units.png"
+    },
+    {
+      "percent": 1,
+      "prompt": "I wanted to spell with my spoonful of alphabet soup. What’s the longest word I could create using the letters in the spoon as many times as I want?",
+      "accepted": [
+        "INCONVENIENCED",
+        "inconvenienced",
+        "Inconvenienced",
+        "inconvenienced",
+        "inconvenien ced",
+        "in-convenienced"
+      ],
+      "image": "alphabet-soup.png"
+    }
+  ]
+}

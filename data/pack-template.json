@@ -1,0 +1,82 @@
+{
+  "name": "My Question Pack",
+  "questions": [
+    {
+      "percent": 90,
+      "prompt": "REPLACE — easiest question",
+      "accepted": ["answer", "alternate spelling"]
+    },
+    {
+      "percent": 80,
+      "prompt": "REPLACE",
+      "accepted": ["answer"]
+    },
+    {
+      "percent": 70,
+      "prompt": "REPLACE",
+      "accepted": ["answer"]
+    },
+    {
+      "percent": 60,
+      "prompt": "REPLACE",
+      "accepted": ["answer"]
+    },
+    {
+      "percent": 50,
+      "prompt": "REPLACE — passes are granted at this question",
+      "accepted": ["answer"]
+    },
+    {
+      "percent": 45,
+      "prompt": "REPLACE",
+      "accepted": ["answer"]
+    },
+    {
+      "percent": 40,
+      "prompt": "REPLACE",
+      "accepted": ["answer"]
+    },
+    {
+      "percent": 35,
+      "prompt": "REPLACE",
+      "accepted": ["answer"]
+    },
+    {
+      "percent": 30,
+      "prompt": "REPLACE — cashout is offered before this question",
+      "accepted": ["answer"]
+    },
+    {
+      "percent": 25,
+      "prompt": "REPLACE — example with image + multiple choice (optional)",
+      "image": "my-picture.png",
+      "choices": ["OPTION A", "OPTION B", "OPTION C"],
+      "accepted": ["option b", "b"]
+    },
+    {
+      "percent": 20,
+      "prompt": "REPLACE",
+      "accepted": ["answer"]
+    },
+    {
+      "percent": 15,
+      "prompt": "REPLACE",
+      "accepted": ["answer"]
+    },
+    {
+      "percent": 10,
+      "prompt": "REPLACE",
+      "accepted": ["answer"]
+    },
+    {
+      "percent": 5,
+      "prompt": "REPLACE",
+      "accepted": ["answer"]
+    },
+    {
+      "percent": 1,
+      "prompt": "REPLACE — hardest / 1% question",
+      "accepted": ["answer"]
+    }
+  ]
+}
