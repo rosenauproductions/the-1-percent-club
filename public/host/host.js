@@ -354,11 +354,14 @@ function render() {
       main.innerHTML = `
         <div class="card">
           <h2>${outCount} eliminated</h2>
-          <p class="muted">${
-            allOut
-              ? 'Everyone is out this round. TV is on the eliminated board.'
-              : 'TV is showing how many went out this round.'
-          }</p>
+          <p class="muted">
+            ${
+              allOut
+                ? 'Everyone is out. TV is on the eliminated board — roast them, then end.'
+                : 'TV is showing outs. Next: who remains, then you roast.'
+            }
+          </p>
+          ${allOut ? renderRoastLists() : ''}
           <button class="btn-primary big-btn" style="margin-top:0.85rem" data-act="advance">
             ${allOut ? 'End game' : 'Show who remains'}
           </button>
@@ -368,9 +371,12 @@ function render() {
     case 'left_count':
       main.innerHTML = `
         <div class="card">
-          <h2>${activePlayers().length} remain</h2>
-          <p class="muted">TV is showing how many contestants remain.</p>
-          <button class="btn-primary big-btn" style="margin-top:0.85rem" data-act="advance">Show prize pot</button>
+          <h2>${activePlayers().length} left!</h2>
+          <p class="host-script" style="margin:0.65rem 0;font-weight:700;line-height:1.4">
+            TV is on the remain board. Now roast the wrong answers — then continue.
+          </p>
+          ${renderRoastLists()}
+          <button class="btn-primary big-btn" style="margin-top:0.85rem" data-act="advance">Done roasting · prize pot</button>
         </div>`;
       break;
     case 'prize_pot':
@@ -387,13 +393,23 @@ function render() {
     case 'eliminating':
       if (state.elimination?.stage === 'pending') {
         const r = state.reveal;
-        const wrongN = r?.eliminated ?? 0;
         main.innerHTML = `
           <div class="card">
-            <h2>Round over · ${r?.percent ?? '?'}%</h2>
-            <p class="muted">${wrongN} wrong · ${r?.survived ?? 0} safe — read the wrong answers, then hit show.</p>
-            ${renderRoastLists()}
-            <button class="btn-primary big-btn" style="margin-top:0.85rem" data-act="show_results">Show wrong players</button>
+            <h2>Time’s up · ${r?.percent ?? '?'}%</h2>
+            <div class="host-script" style="margin:0.75rem 0;font-weight:700;line-height:1.45">
+              <p style="margin:0 0 0.5rem">Say something like:</p>
+              <p style="margin:0;color:var(--club-gold,#ffd54a)">
+                “Let’s see who got it right…”
+              </p>
+              <p class="muted" style="margin:0.65rem 0 0;font-weight:600">
+                Then hit the button — suspense lights, then thumps. You’ll get the wrong answers
+                <em>after</em> we see who’s left.
+              </p>
+            </div>
+            <p class="muted">${r?.eliminated ?? 0} will be going out · ${r?.survived ?? 0} safe (don’t spoil yet)</p>
+            <button class="btn-primary big-btn" style="margin-top:0.85rem" data-act="show_results">
+              Let’s see who got it right
+            </button>
           </div>`;
       } else {
         const stage = state.elimination?.stage;
@@ -401,15 +417,17 @@ function render() {
         const sting = stage === 'sting';
         main.innerHTML = `
           <div class="card">
-            <h2>Elimination</h2>
+            <h2>${scanning ? 'Suspense…' : sting ? 'Thumps…' : 'Lighting outs…'}</h2>
             <p class="muted">${
               scanning
-                ? `TV eliminating.mp3 × ${state.elimination?.stingTimes || 1} — keep roasting`
+                ? `TV eliminating.mp3 × ${state.elimination?.stingTimes || 1} — wait for the thumps`
                 : sting
-                  ? `Thump sequence — keep roasting`
+                  ? `Thump sequence (${state.elimination?.revealedCount || 0} / ${state.elimination?.wrongIds?.length || 0})`
                   : `Lighting out ${state.elimination?.revealedCount || 0} / ${state.elimination?.wrongIds?.length || 0}`
             }</p>
-            ${renderRoastLists()}
+            <p class="muted" style="margin-top:0.65rem">
+              Hold your roasts — wrong answers show after “who remains.”
+            </p>
           </div>`;
       }
       break;
