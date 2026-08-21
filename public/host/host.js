@@ -532,6 +532,25 @@ loadPacks()
     showBoot(`Host failed to start: ${err.message}`, { error: true });
   });
 
+document.querySelector('.host-title')?.addEventListener('click', () => {
+  if (testMode) return;
+  hostTitleTaps += 1;
+  clearTimeout(hostTitleTapTimer);
+  hostTitleTapTimer = setTimeout(() => {
+    hostTitleTaps = 0;
+  }, 1200);
+  if (hostTitleTaps >= 5) {
+    hostTitleTaps = 0;
+    testMode = true;
+    try {
+      history.replaceState(null, '', `${location.pathname}?test=1`);
+    } catch {
+      // ignore
+    }
+    if (state) render();
+  }
+});
+
 setTimeout(() => {
   if (!state) {
     showBoot(`Still connecting… Is the server running at <code>${location.origin}</code>?`, {
