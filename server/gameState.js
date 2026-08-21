@@ -855,7 +855,7 @@ export function enterLeftCount(state) {
 
 /** Prize pot / jackpot spectacle (show money). */
 export function enterPrizePot(state) {
-  return actionMeta(cue({ ...state, phase: 'prize_pot' }, 'jackpot'), 'prize_pot');
+  return actionMeta(cue({ ...state, phase: 'prize_pot' }, 'eliminate', { audience: 'all' }), 'prize_pot');
 }
 
 /** TV board: host announced the correct answer (during/after roast). */
