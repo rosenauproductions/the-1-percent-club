@@ -7,6 +7,7 @@ import {
   isAudioActivated,
   stopPendingEliminating,
 } from '../shared/audio.js';
+import { scanSpotlightId } from '../shared/elimScan.js';
 
 installErrorHandlers('play');
 mountQaWidget('play', { audioTools: true });
@@ -465,9 +466,16 @@ function render() {
 
   const p = me();
   if (!p || (p.status !== 'out' && state?.phase !== 'eliminating')) {
-    document.body.classList.remove('is-eliminated', 'elim-searching', 'elim-scanning');
+    document.body.classList.remove(
+      'is-eliminated',
+      'elim-searching',
+      'elim-scanning',
+      'elim-scan-hit',
+      'elim-scan-miss',
+    );
   }
   syncEliminationUi(p);
+  ensureScanTick();
 
   meta.textContent = p
     ? `${p.name} · ${p.status}${p.hasPass && !p.usedPass ? ' · PASS' : ''}`
@@ -686,12 +694,33 @@ main.addEventListener('keydown', (e) => {
 });
 
 let lastFlashCurrentId = null;
+let scanTick = null;
+
+function ensureScanTick() {
+  const scanning =
+    state?.phase === 'eliminating' && state.elimination?.stage === 'scanning';
+  if (scanning) {
+    if (!scanTick) {
+      scanTick = setInterval(() => {
+        syncEliminationUi(me());
+      }, 100);
+    }
+  } else if (scanTick) {
+    clearInterval(scanTick);
+    scanTick = null;
+  }
+}
 
 function syncEliminationUi(p) {
   const elim = state?.elimination;
-  // All phones flash normal / dark / blue while TV plays eliminating.mp3
+  // Search hops phone-to-phone while eliminating.mp3 plays (even if nobody is wrong)
   const scanning =
-    state?.phase === 'eliminating' && elim?.stage === 'scanning' && !!p;
+    state?.phase === 'eliminating' &&
+    elim?.stage === 'scanning' &&
+    !!p &&
+    p.status === 'active';
+  const spot = scanning ? scanSpotlightId(elim, state.players) : null;
+  const onMe = !!(scanning && spot && spot === p.id);
   const searching =
     state?.phase === 'eliminating' &&
     elim?.stage === 'sting' &&
@@ -707,6 +736,8 @@ function syncEliminationUi(p) {
     elim.currentId === p.id;
 
   document.body.classList.toggle('elim-scanning', !!scanning);
+  document.body.classList.toggle('elim-scan-hit', !!onMe);
+  document.body.classList.toggle('elim-scan-miss', !!(scanning && !onMe));
   document.body.classList.toggle('elim-searching', !!searching && !scanning);
   document.body.classList.toggle('is-eliminated', !!(amLit && p?.status === 'out'));
 
@@ -780,7 +811,7 @@ function onState(next) {
     stopPendingEliminating();
   }
   if (next.phase !== 'eliminating') {
-    document.body.classList.remove('elim-scanning');
+    document.body.classList.remove('elim-scanning', 'elim-scan-hit', 'elim-scan-miss');
   }
   if (next.soundCue) noteSoundCue(next.soundCue);
   const p = me();

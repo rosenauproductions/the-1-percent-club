@@ -860,6 +860,7 @@ export function showResults(state) {
         elimination: {
           ...state.elimination,
           stage: 'scanning',
+          scanStartedAt: Date.now(),
           stingTimes: times,
           stingSound: 'eliminating',
           stingTargetId: null,

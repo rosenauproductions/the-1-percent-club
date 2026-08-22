@@ -245,11 +245,31 @@ body.display-body {
 }
 
 .seat.searching {
-  background: linear-gradient(180deg, rgba(120, 255, 180, 0.35), rgba(70, 130, 230, 0.55));
-  color: #dce9ff;
-  border-color: rgba(90, 150, 255, 0.45);
-  box-shadow: 0 0 14px rgba(90, 150, 255, 0.45);
-  animation: seat-search-pulse 1.1s ease-in-out infinite alternate;
+  background: linear-gradient(180deg, rgba(120, 255, 180, 0.25), rgba(40, 100, 160, 0.35));
+  color: #c5d4ef;
+  border-color: rgba(90, 150, 255, 0.25);
+  box-shadow: none;
+  transition: background 0.12s ease, box-shadow 0.12s ease, filter 0.12s ease;
+}
+
+.seat.searching--miss {
+  filter: brightness(0.55);
+  opacity: 0.75;
+}
+
+.seat.searching--hit {
+  background: linear-gradient(180deg, #9ec8ff, #3a6fd0);
+  color: #eef5ff;
+  border-color: rgba(160, 210, 255, 0.95);
+  box-shadow: 0 0 22px rgba(120, 180, 255, 0.85);
+  filter: brightness(1.15);
+  opacity: 1;
+  animation: seat-search-hit 0.28s ease-out;
+}
+
+@keyframes seat-search-hit {
+  from { filter: brightness(1.45); }
+  to { filter: brightness(1.15); }
 }
 
 @keyframes seat-search-pulse {
@@ -811,6 +831,30 @@ body.image-board-mode .main {
 
 .pct-timer--hold .pct-timer__leds {
   opacity: 0.9;
+}
+
+.elim-board-wrap {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+
+.elim-board-img {
+  max-width: 95%;
+  max-height: 95%;
+  object-fit: contain;
+  border-radius: calc(0.6 * var(--u));
+}
+
+.elim-board-wrap .image-board__locks {
+  position: absolute;
+  left: 50%;
+  bottom: 4%;
+  transform: translateX(-50%);
+  z-index: 2;
 }
 
 .elim-status {

@@ -12,6 +12,7 @@ import {
   seekTimerToEnd,
 } from '../shared/audio.js';
 import { installErrorHandlers, mountQaWidget, showBoot, hideBoot } from '../shared/boot.js';
+import { scanSpotlightId } from '../shared/elimScan.js';
 
 installErrorHandlers('display');
 mountQaWidget('display');
@@ -25,9 +26,36 @@ const tapHint = document.getElementById('tapHint');
 let state = null;
 let lastSoundAt = null;
 let timerInterval = null;
+let scanTick = null;
 
 function money(n) {
   return `$${Number(n || 0).toLocaleString('en-US')}`;
+}
+
+function syncScanSeats() {
+  if (!state?.players?.length) return;
+  const elim = state.elimination;
+  if (state.phase !== 'eliminating' || elim?.stage !== 'scanning') return;
+  for (const p of state.players) {
+    const el = main.querySelector(`.seat[data-player-id="${CSS.escape(p.id)}"]`);
+    if (!el) continue;
+    el.className = `seat ${seatClass(p)}`;
+  }
+}
+
+function ensureScanTick() {
+  const scanning =
+    state?.phase === 'eliminating' && state.elimination?.stage === 'scanning';
+  if (scanning) {
+    if (!scanTick) {
+      scanTick = setInterval(() => {
+        syncScanSeats();
+      }, 100);
+    }
+  } else if (scanTick) {
+    clearInterval(scanTick);
+    scanTick = null;
+  }
 }
 
 function seatClass(p) {
@@ -40,9 +68,10 @@ function seatClass(p) {
     return 'flash-out';
   }
   if (p.status === 'out' || elim?.revealedIds?.includes(p.id)) return 'out';
-  // All active seats pulse while eliminating.mp3 plays (show wrongs)
+  // Blue-light search hops seat-to-seat during eliminating.mp3
   if (elim?.stage === 'scanning' && p.status === 'active') {
-    return 'searching';
+    const spot = scanSpotlightId(elim, state.players);
+    return spot === p.id ? 'searching searching--hit' : 'searching searching--miss';
   }
   // Only the next target pulses during thump sting (one-at-a-time)
   if (
@@ -50,7 +79,7 @@ function seatClass(p) {
     p.status === 'active' &&
     elim.stingTargetId === p.id
   ) {
-    return 'searching';
+    return 'searching searching--hit';
   }
   if (p.usedPass) return 'pass';
   return 'active';
@@ -64,7 +93,7 @@ function renderSeatGrid(players, { fillTo = 0 } = {}) {
   for (let i = 0; i < count; i++) {
     const p = players[i];
     seats.push(
-      `<div class="seat ${seatClass(p)}" title="${p ? p.name : ''}">${p ? escapeHtml(p.name) : ''}</div>`,
+      `<div class="seat ${seatClass(p)}" data-player-id="${p ? escapeHtml(p.id) : ''}" title="${p ? escapeHtml(p.name) : ''}">${p ? escapeHtml(p.name) : ''}</div>`,
     );
   }
   return `<div class="seat-grid" style="grid-template-columns: repeat(${cols}, 1fr)">${seats.join('')}</div>`;
@@ -377,7 +406,8 @@ function renderEliminating() {
   else if (sting) statusLine = 'Blue lights scanning…';
   else if (showTally) statusLine = `${outCount} out · ${leftCount} left`;
 
-  if (imageOnly && hasImage) {
+  // During the search / thump, show seats beside the board so the light can hop
+  if (imageOnly && hasImage && !(scanning || elim.stage === 'sting')) {
     renderFullBleedBoard({
       src: q.image,
       transform: q.imageTransform,
@@ -385,6 +415,25 @@ function renderEliminating() {
         ? `<div class="image-board__locks elim-status ${sting ? 'elim-status--scan' : ''}">${escapeHtml(statusLine)}</div>`
         : '',
     });
+    return;
+  }
+
+  if (imageOnly && hasImage && (scanning || elim.stage === 'sting')) {
+    main.innerHTML = `
+      <div class="question-layout question-layout--elim">
+        <div class="question-panel question-panel--board">
+          <div class="elim-board-wrap">
+            <img class="elim-board-img" src="${escapeHtml(q.image)}" alt="" style="${imageTransformStyle(q.imageTransform)}" />
+            ${
+              statusLine
+                ? `<div class="image-board__locks elim-status elim-status--scan">${escapeHtml(statusLine)}</div>`
+                : ''
+            }
+          </div>
+        </div>
+        <div class="side-grid">${renderSeatGrid(state.players)}</div>
+      </div>
+    `;
     return;
   }
 
@@ -829,6 +878,7 @@ function onState(next) {
     stopAllMusic();
   }
   render();
+  ensureScanTick();
   if (next.phase === 'answering') startTimerTick();
   handleSoundCue(next.soundCue);
 }
