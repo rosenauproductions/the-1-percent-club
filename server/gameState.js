@@ -1066,8 +1066,10 @@ function continueAfterBoards(state) {
 }
 
 /**
- * Full wipeout — furthest-advancing contestants (everyone wrong this round)
- * are restored as finalists and jump to the Final Decision / solo offer.
+ * Full wipeout — furthest-advancing contestants become finalists.
+ * Those still in when the wipeout question was asked (everyone wrong this round)
+ * are restored and jump to the Final Decision / solo offer — including an early
+ * wipeout on 90% (UK/US: the show never ends with “nobody reaches the final”).
  */
 function enterWipeoutFinal(state) {
   const finalistIds =

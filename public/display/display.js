@@ -390,11 +390,23 @@ function renderLeftCount() {
   `;
 }
 
+let potAnimToken = 0;
+/** @type {string|null} */
+let potAnimKey = null;
+
 function renderPrizePot() {
   const to = Number(state.jackpot) || 0;
   const from = Number.isFinite(Number(state.prevJackpot))
     ? Number(state.prevJackpot)
     : to;
+  // clear_sound / extra broadcasts re-enter render while still on prize_pot —
+  // don't rebuild the board or restart the count-up.
+  const key = `${state.lastAction?.at ?? 'x'}:${from}->${to}`;
+  if (main.querySelector('.prize-pot') && potAnimKey === key) {
+    return;
+  }
+  potAnimKey = key;
+
   const signs = Array.from({ length: 36 }, (_, i) => {
     const left = 4 + ((i * 17) % 92);
     const delay = ((i * 0.11) % 2.4).toFixed(2);
@@ -422,9 +434,11 @@ function renderPrizePot() {
 }
 
 function animateMoney(el, from, to, durationMs) {
+  const token = ++potAnimToken;
   const start = performance.now();
   const delta = to - from;
   const tick = (now) => {
+    if (token !== potAnimToken) return;
     const t = Math.min(1, (now - start) / durationMs);
     const eased = 1 - (1 - t) ** 3;
     el.textContent = money(Math.round(from + delta * eased));
@@ -569,6 +583,7 @@ function render() {
   jackpotEl.textContent = money(state.jackpot);
   aliveEl.textContent = String(state.players.filter((p) => p.status === 'active').length);
   document.body.classList.toggle('prize-pot-mode', state.phase === 'prize_pot');
+  if (state.phase !== 'prize_pot') potAnimKey = null;
   document.body.classList.toggle(
     'left-count-mode',
     state.phase === 'left_count' || state.phase === 'eliminated_count',

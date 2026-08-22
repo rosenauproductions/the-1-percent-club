@@ -394,7 +394,7 @@ function render() {
           <p class="muted">
             ${
               wipeout
-                ? 'Full wipeout — furthest contestants become finalists after the boards.'
+                ? 'Full wipeout — furthest contestants (everyone who reached this question) become finalists after the pot.'
                 : allOut
                   ? 'Everyone is out. TV is on the eliminated board — roast them, then end.'
                   : 'TV is showing outs. Next: who remains, then you roast.'
@@ -421,7 +421,7 @@ function render() {
           <p class="host-script" style="margin:0.65rem 0;font-weight:700;line-height:1.4">
             ${
               wipeout
-                ? 'Everyone missed. Roast them, show the answer, then jump to the Final Decision.'
+                ? 'Everyone missed. Per show rules they’re still the furthest — roast, show the answer, pot, then Final Decision.'
                 : 'Blue lights and thumps are done. TV shows who’s left — now roast the wrong answers.'
             }
           </p>
