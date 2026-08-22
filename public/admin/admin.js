@@ -204,8 +204,17 @@ function renderPreview() {
   const sSrc = imageSrc('s', q, selectedIndex) || qSrc;
   const hasChoices = !imageOnly && Array.isArray(q.choices) && q.choices.length > 0;
   const accepted = (q.accepted || []).slice(0, 3).join(' / ') || '—';
+  const frame = document.querySelector('.admin-display-frame');
+  frame?.classList.toggle('image-board-mode', imageOnly && !!(previewMode === 'answer' ? sSrc : qSrc));
 
   if (previewMode === 'answer') {
+    if (imageOnly && sSrc) {
+      els.previewMain.innerHTML = `
+        <div class="image-board">
+          <img class="image-board__img" src="${escapeHtml(sSrc)}" alt="" style="${imageTransformStyle(t)}" />
+        </div>`;
+      return;
+    }
     els.previewMain.innerHTML = `
       <div class="reveal-layout reveal-layout--answer-only">
         <div class="pct-badge" style="align-self:center">${q.percent}%</div>
@@ -222,12 +231,26 @@ function renderPreview() {
     return;
   }
 
+  if (imageOnly && qSrc) {
+    els.previewMain.innerHTML = `
+      <div class="image-board">
+        <img class="image-board__img" src="${escapeHtml(qSrc)}" alt="" style="${imageTransformStyle(t)}" />
+        <div class="image-board__overlay">
+          <div class="image-board__meta">
+            <div class="timer">30</div>
+            <div class="lock-progress">0 / 12 locked in</div>
+          </div>
+        </div>
+      </div>`;
+    return;
+  }
+
   els.previewMain.innerHTML = `
     <div class="question-layout">
       <div class="question-panel">
         <div class="pct-badge">${q.percent}%<small>OF PEOPLE GOT THIS RIGHT</small></div>
-        <div class="question-flow ${qSrc ? 'question-flow--has-image' : ''} ${imageOnly ? 'question-flow--image-only' : ''}" data-image-layout="stack">
-          ${imageOnly ? '' : `<p class="prompt q-area-prompt">${escapeHtml(q.prompt || 'Prompt…')}</p>`}
+        <div class="question-flow ${qSrc ? 'question-flow--has-image' : ''}" data-image-layout="stack">
+          <p class="prompt q-area-prompt">${escapeHtml(q.prompt || 'Prompt…')}</p>
           ${
             qSrc
               ? `<div class="question-image-wrap q-area-image"><img class="question-image" src="${escapeHtml(qSrc)}" alt="" style="${imageTransformStyle(t)}" /></div>`

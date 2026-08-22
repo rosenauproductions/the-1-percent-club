@@ -175,6 +175,33 @@ function renderChoices(choices) {
   </div>`;
 }
 
+function imageTransformStyle(t) {
+  if (!t || typeof t !== 'object') return '';
+  const scale = Number(t.scale);
+  const x = Number(t.x);
+  const y = Number(t.y);
+  if (![scale, x, y].every((n) => Number.isFinite(n))) return '';
+  return `transform: translate(${x}%, ${y}%) scale(${scale}); transform-origin: center center;`;
+}
+
+/** Full-bleed show graphic (hidePrompt packs) — sits behind the gold stage bezel. */
+function renderFullBleedBoard({ src, transform = null, overlay = '' }) {
+  if (!src) {
+    main.innerHTML = `<div class="center-phase"><h1>Missing board image</h1></div>`;
+    return;
+  }
+  main.innerHTML = `
+    <div class="image-board">
+      <img class="image-board__img" src="${escapeHtml(src)}" alt="" style="${imageTransformStyle(transform)}" />
+      ${overlay ? `<div class="image-board__overlay">${overlay}</div>` : ''}
+    </div>
+  `;
+}
+
+function isImageBoardQuestion(q = state?.currentQuestion) {
+  return !!q?.hidePrompt;
+}
+
 function renderQuestion() {
   const q = state.currentQuestion;
   const secs = secondsLeft();
@@ -182,7 +209,7 @@ function renderQuestion() {
   const locked = Object.values(state.answers || {}).filter((a) => a.locked).length;
   const answering = state.phase === 'answering';
   const hostHold = !answering && (!!q?.promptHidden || !q?.prompt);
-  const imageOnly = !!q?.hidePrompt;
+  const imageOnly = isImageBoardQuestion(q);
   const hasImage = !!q?.image && !hostHold;
   const hasChoices =
     !hostHold && !imageOnly && Array.isArray(q?.choices) && q.choices.length > 0;
@@ -200,16 +227,27 @@ function renderQuestion() {
     return;
   }
 
+  if (imageOnly && hasImage) {
+    const overlay = answering
+      ? `<div class="image-board__meta">
+          <div class="timer ${secs !== null && secs <= 5 ? 'warn' : ''}" id="tvTimer">${secs ?? '—'}</div>
+          <div class="lock-progress">${locked} / ${active.length} locked in</div>
+        </div>`
+      : '';
+    renderFullBleedBoard({
+      src: q.image,
+      transform: q.imageTransform,
+      overlay,
+    });
+    return;
+  }
+
   main.innerHTML = `
     <div class="question-layout">
       <div class="question-panel" id="questionPanel">
         <div class="pct-badge">${q?.percent ?? '?'}%<small>OF PEOPLE GOT THIS RIGHT</small></div>
-        <div class="question-flow ${hasImage ? 'question-flow--has-image' : ''} ${imageOnly ? 'question-flow--image-only' : ''}" data-image-layout="stack">
-          ${
-            imageOnly
-              ? ''
-              : `<p class="prompt q-area-prompt">${escapeHtml(q?.prompt ?? '')}</p>`
-          }
+        <div class="question-flow ${hasImage ? 'question-flow--has-image' : ''}" data-image-layout="stack">
+          <p class="prompt q-area-prompt">${escapeHtml(q?.prompt ?? '')}</p>
           ${
             hasImage
               ? `<div class="question-image-wrap q-area-image"><img class="question-image" src="${escapeHtml(q.image)}" alt="" style="${imageTransformStyle(q.imageTransform)}" /></div>`
@@ -274,7 +312,7 @@ function renderEliminating() {
   const scanning = elim.stage === 'scanning';
   const sting = elim.stage === 'sting' || scanning;
   const q = state.currentQuestion;
-  const imageOnly = !!q?.hidePrompt;
+  const imageOnly = isImageBoardQuestion(q);
   const hasImage = !!q?.image;
   const hasChoices =
     !imageOnly && Array.isArray(q?.choices) && q.choices.length > 0;
@@ -286,17 +324,24 @@ function renderEliminating() {
   else if (sting) statusLine = 'Blue lights scanning…';
   else if (showTally) statusLine = `${outCount} out · ${leftCount} left`;
 
+  if (imageOnly && hasImage) {
+    renderFullBleedBoard({
+      src: q.image,
+      transform: q.imageTransform,
+      overlay: statusLine
+        ? `<div class="image-board__meta"><div class="elim-status ${sting ? 'elim-status--scan' : ''}">${escapeHtml(statusLine)}</div></div>`
+        : '',
+    });
+    return;
+  }
+
   // Keep the question on screen the entire blue-light beat (TV show style).
   main.innerHTML = `
     <div class="question-layout question-layout--elim">
       <div class="question-panel" id="questionPanel">
         <div class="pct-badge">${q?.percent ?? '?'}%<small>OF PEOPLE GOT THIS RIGHT</small></div>
-        <div class="question-flow ${hasImage ? 'question-flow--has-image' : ''} ${imageOnly ? 'question-flow--image-only' : ''}" data-image-layout="stack">
-          ${
-            imageOnly
-              ? ''
-              : `<p class="prompt q-area-prompt">${escapeHtml(q?.prompt ?? '')}</p>`
-          }
+        <div class="question-flow ${hasImage ? 'question-flow--has-image' : ''}" data-image-layout="stack">
+          <p class="prompt q-area-prompt">${escapeHtml(q?.prompt ?? '')}</p>
           ${
             hasImage
               ? `<div class="question-image-wrap q-area-image"><img class="question-image" src="${escapeHtml(q.image)}" alt="" style="${imageTransformStyle(q.imageTransform)}" /></div>`
@@ -396,6 +441,16 @@ function renderAnswerReveal() {
   const solutionTransform = q?.solutionImage
     ? q.solutionImageTransform || q.imageTransform
     : q?.imageTransform;
+
+  // Full show boards already include the answer art — fill the stage.
+  if (isImageBoardQuestion(q) && solutionSrc) {
+    renderFullBleedBoard({
+      src: solutionSrc,
+      transform: solutionTransform,
+    });
+    return;
+  }
+
   main.innerHTML = `
     <div class="reveal-layout reveal-layout--answer-only">
       <div class="pct-badge" style="align-self:center">${r?.percent ?? '?'}%</div>
@@ -410,15 +465,6 @@ function renderAnswerReveal() {
       </div>
     </div>
   `;
-}
-
-function imageTransformStyle(t) {
-  if (!t || typeof t !== 'object') return '';
-  const scale = Number(t.scale);
-  const x = Number(t.x);
-  const y = Number(t.y);
-  if (![scale, x, y].every((n) => Number.isFinite(n))) return '';
-  return `transform: translate(${x}%, ${y}%) scale(${scale}); transform-origin: center center;`;
 }
 
 function renderReveal() {
@@ -527,6 +573,18 @@ function render() {
     'left-count-mode',
     state.phase === 'left_count' || state.phase === 'eliminated_count',
   );
+
+  const imageBoard =
+    isImageBoardQuestion(state.currentQuestion) &&
+    (state.phase === 'answering' ||
+      state.phase === 'question' ||
+      state.phase === 'eliminating' ||
+      state.phase === 'answer_reveal') &&
+    !(
+      state.phase === 'question' &&
+      (state.currentQuestion?.promptHidden || !state.currentQuestion?.prompt)
+    );
+  document.body.classList.toggle('image-board-mode', imageBoard);
 
   switch (state.phase) {
     case 'lobby':
