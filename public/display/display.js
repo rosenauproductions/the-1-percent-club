@@ -114,20 +114,30 @@ function startTimerTick() {
   if (timerInterval) clearInterval(timerInterval);
   timerInterval = setInterval(() => {
     if (state?.phase !== 'answering') return;
+    const secs = secondsLeft();
+    const total = answerSecondsTotal();
+    const badge = document.getElementById('pctTimerBadge');
+    if (badge) {
+      const progress = secs == null ? 1 : Math.max(0, secs) / total;
+      badge.style.setProperty('--progress', progress.toFixed(4));
+      badge.classList.toggle('pct-timer--warn', secs !== null && secs <= 5);
+      const secsEl = document.getElementById('tvTimer');
+      if (secsEl) secsEl.textContent = String(secs ?? '—');
+    }
     const el = document.getElementById('tvTimer');
-    if (el) {
-      const secs = secondsLeft();
+    if (el && !badge) {
       el.textContent = String(secs ?? '—');
       el.classList.toggle('warn', secs !== null && secs <= 5);
-      const lock = document.querySelector('.lock-progress');
-      if (lock && state) {
-        const active = state.players.filter((p) => p.status === 'active').length;
-        const locked = Object.values(state.answers || {}).filter((a) => a.locked).length;
-        lock.textContent = `${locked} / ${active} locked in`;
-      }
-    } else {
-      render();
     }
+    const lock =
+      document.querySelector('.image-board__locks') ||
+      document.querySelector('.lock-progress');
+    if (lock && state && !lock.classList.contains('elim-status')) {
+      const active = state.players.filter((p) => p.status === 'active').length;
+      const locked = Object.values(state.answers || {}).filter((a) => a.locked).length;
+      lock.textContent = `${locked} / ${active} locked in`;
+    }
+    if (!el && !badge) render();
   }, 200);
 }
 
@@ -184,7 +194,7 @@ function imageTransformStyle(t) {
   return `transform: translate(${x}%, ${y}%) scale(${scale}); transform-origin: center center;`;
 }
 
-/** Full-bleed show graphic (hidePrompt packs) — sits behind the gold stage bezel. */
+/** Full-bleed show graphic — sits behind the gold stage bezel at 95%. */
 function renderFullBleedBoard({ src, transform = null, overlay = '' }) {
   if (!src) {
     main.innerHTML = `<div class="center-phase"><h1>Missing board image</h1></div>`;
@@ -192,14 +202,44 @@ function renderFullBleedBoard({ src, transform = null, overlay = '' }) {
   }
   main.innerHTML = `
     <div class="image-board">
-      <img class="image-board__img" src="${escapeHtml(src)}" alt="" style="${imageTransformStyle(transform)}" />
+      <div class="image-board__frame">
+        <img class="image-board__img" src="${escapeHtml(src)}" alt="" style="${imageTransformStyle(transform)}" />
+      </div>
       ${overlay ? `<div class="image-board__overlay">${overlay}</div>` : ''}
     </div>
   `;
 }
 
 function isImageBoardQuestion(q = state?.currentQuestion) {
-  return !!q?.hidePrompt;
+  return !!(q?.hidePrompt || q?.image);
+}
+
+function answerSecondsTotal() {
+  return state?.setup?.answerSeconds || 30;
+}
+
+/** LED-ring badge: center = question %, ring = time remaining. */
+function renderPctTimerBadge({ percent, secs, totalSecs, answering }) {
+  const total = Math.max(1, Number(totalSecs) || 30);
+  const left = answering && secs != null ? Math.max(0, secs) : total;
+  const progress = answering ? left / total : 1;
+  const warn = answering && secs != null && secs <= 5;
+  return `
+    <div class="pct-timer ${warn ? 'pct-timer--warn' : ''} ${answering ? 'pct-timer--live' : 'pct-timer--hold'}"
+         style="--progress:${progress.toFixed(4)}"
+         id="pctTimerBadge"
+         data-total="${total}">
+      <div class="pct-timer__leds" aria-hidden="true"></div>
+      <div class="pct-timer__face">
+        <div class="pct-timer__percent">${escapeHtml(String(percent ?? '?'))}%</div>
+        ${
+          answering
+            ? `<div class="pct-timer__secs" id="tvTimer">${secs ?? '—'}</div>`
+            : `<div class="pct-timer__hint">READY</div>`
+        }
+      </div>
+    </div>
+  `;
 }
 
 function renderQuestion() {
@@ -208,13 +248,13 @@ function renderQuestion() {
   const active = state.players.filter((p) => p.status === 'active');
   const locked = Object.values(state.answers || {}).filter((a) => a.locked).length;
   const answering = state.phase === 'answering';
-  const hostHold = !answering && (!!q?.promptHidden || !q?.prompt);
+  // Brand hold only when we truly have no board image yet
+  const hostHold = !answering && !!q?.promptHidden && !q?.image;
   const imageOnly = isImageBoardQuestion(q);
   const hasImage = !!q?.image && !hostHold;
   const hasChoices =
     !hostHold && !imageOnly && Array.isArray(q?.choices) && q.choices.length > 0;
 
-  // Host talk beat — brand mark only until Start reveals the question.
   if (hostHold) {
     main.innerHTML = `
       <div class="question-layout">
@@ -228,12 +268,19 @@ function renderQuestion() {
   }
 
   if (imageOnly && hasImage) {
-    const overlay = answering
-      ? `<div class="image-board__meta">
-          <div class="timer ${secs !== null && secs <= 5 ? 'warn' : ''}" id="tvTimer">${secs ?? '—'}</div>
-          <div class="lock-progress">${locked} / ${active.length} locked in</div>
-        </div>`
-      : '';
+    const overlay = `
+      ${renderPctTimerBadge({
+        percent: q.percent,
+        secs,
+        totalSecs: answerSecondsTotal(),
+        answering,
+      })}
+      ${
+        answering
+          ? `<div class="image-board__locks">${locked} / ${active.length} locked in</div>`
+          : ''
+      }
+    `;
     renderFullBleedBoard({
       src: q.image,
       transform: q.imageTransform,
@@ -328,9 +375,19 @@ function renderEliminating() {
     renderFullBleedBoard({
       src: q.image,
       transform: q.imageTransform,
-      overlay: statusLine
-        ? `<div class="image-board__meta"><div class="elim-status ${sting ? 'elim-status--scan' : ''}">${escapeHtml(statusLine)}</div></div>`
-        : '',
+      overlay: `
+        ${renderPctTimerBadge({
+          percent: q.percent,
+          secs: null,
+          totalSecs: answerSecondsTotal(),
+          answering: false,
+        })}
+        ${
+          statusLine
+            ? `<div class="image-board__locks elim-status ${sting ? 'elim-status--scan' : ''}">${escapeHtml(statusLine)}</div>`
+            : ''
+        }
+      `,
     });
     return;
   }
@@ -461,6 +518,12 @@ function renderAnswerReveal() {
     renderFullBleedBoard({
       src: solutionSrc,
       transform: solutionTransform,
+      overlay: renderPctTimerBadge({
+        percent: r?.percent ?? q?.percent,
+        secs: null,
+        totalSecs: answerSecondsTotal(),
+        answering: false,
+      }),
     });
     return;
   }
@@ -591,14 +654,11 @@ function render() {
 
   const imageBoard =
     isImageBoardQuestion(state.currentQuestion) &&
+    !!state.currentQuestion?.image &&
     (state.phase === 'answering' ||
       state.phase === 'question' ||
       state.phase === 'eliminating' ||
-      state.phase === 'answer_reveal') &&
-    !(
-      state.phase === 'question' &&
-      (state.currentQuestion?.promptHidden || !state.currentQuestion?.prompt)
-    );
+      state.phase === 'answer_reveal');
   document.body.classList.toggle('image-board-mode', imageBoard);
 
   switch (state.phase) {

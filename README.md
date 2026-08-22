@@ -103,34 +103,25 @@ JSON files in `data/questions/`. Need **15** questions in order (90% → 1%):
 Put images in a folder named after the pack file:
 
 ```
-data/questions/pack-1.json
-public/images/questions/pack-1/owl-worm.png
+data/questions/split-decision.json
+public/images/questions/split-decision/90a.png
+public/images/questions/split-decision/90b.png
 ```
 
-Then set `"image": "owl-worm.png"` on that question. The TV shows it **above** the prompt when space allows (between instructions and choices); if it can’t fit, the image moves to the **left**.
+Then set `"image": "90a.png"` / `"solutionImage": "90b.png"`. TV shows boards **full-screen** inside the gold bezel (about 95% of the stage).
 
-Optional `"choices": ["A text", "B text", …]` draws A/B/C tiles on the TV. Players can still type the word or letter.
+Optional `"choices"` are usually baked into the board art for image packs.
 
 Optional `"explanation": "…"` is host-only (shown during the roast beat before **Show right answer**).
 
-Optional pack `"settings": { "hidePrompt": true }` hides the prompt text on TV (image-only boards — host still sees the full text). Per-question `"hidePrompt"` overrides the pack default.
-
-Image pairs (recommended for image-heavy packs):
-
-```
-"image": "90a.png",
-"solutionImage": "90b.png"
-```
-
-`image` shows while answering / blue lights; `solutionImage` shows on **Show right answer** (falls back to `image` if omitted).
+Pack `"settings": { "hidePrompt": true }` (default for Split Decision) hides prompt text on TV — host still sees the full text while reading, then taps **Start timer**.
 
 Optional `"imageTransform": { "scale": 1, "x": 0, "y": 0 }` nudges the TV image (use `/admin` to preview).
 
 - Relative names resolve to `/images/questions/<packName>/…`
-- Or use a full path: `"image": "/images/questions/pack-1/owl-worm.png"`
-- Omit `image` / `choices` for plain text questions
+- Or use a full path: `"image": "/images/questions/split-decision/90a.png"`
 
-Example image pack: `data/questions/split-decision.json` → images in `public/images/questions/split-decision/` (`90a.png` / `90b.png`, …).
+Example image pack: `data/questions/split-decision.json` → images in `public/images/questions/split-decision/`.
 
 Start from `data/pack-template.json`, or edit packs in the local **`/admin`** editor and download JSON.
 

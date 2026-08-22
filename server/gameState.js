@@ -60,7 +60,7 @@ function normalizeImageTransform(t) {
 
 function defaultSetup() {
   return {
-    questionFile: 'pack-1.json',
+    questionFile: 'split-decision.json',
     answerSeconds: ANSWER_SECONDS,
     masterVolume: 0.7,
     skipIntro: false,
@@ -208,13 +208,26 @@ export function sanitizeStateForClient(state, role, playerId = null) {
     };
   }
 
-  // Host-only preview: TV/players see percent + seats, not the prompt, until Start.
+  // During host read (question phase): TV gets the board image, not the text prompt.
   if (role !== 'host' && state.phase === 'question' && base.currentQuestion) {
-    base.currentQuestion = {
-      index: base.currentQuestion.index,
-      percent: base.currentQuestion.percent,
-      promptHidden: true,
-    };
+    const q = state.currentQuestion;
+    if (q.image) {
+      base.currentQuestion = {
+        index: q.index,
+        percent: q.percent,
+        hidePrompt: true,
+        image: q.image,
+        imageTransform: q.imageTransform || null,
+        promptHidden: false,
+        hostReading: true,
+      };
+    } else {
+      base.currentQuestion = {
+        index: q.index,
+        percent: q.percent,
+        promptHidden: true,
+      };
+    }
   }
 
   if (role === 'player' && playerId) {
@@ -363,7 +376,8 @@ export function startGame(state, questions, packName = null, packSettings = null
   }
 
   const settings = {
-    hidePrompt: !!(packSettings?.hidePrompt),
+    // Full-screen board packs only for now
+    hidePrompt: true,
   };
 
   const packed = PERCENTAGES.map((pct, i) => {
@@ -391,7 +405,7 @@ export function startGame(state, questions, packName = null, packSettings = null
       prompt: q.prompt ?? q.question,
       hint: q.hint ?? null,
       explanation: q.explanation ? String(q.explanation) : null,
-      hidePrompt: q.hidePrompt != null ? !!q.hidePrompt : settings.hidePrompt,
+      hidePrompt: true,
       image: q.image || null,
       solutionImage: q.solutionImage || null,
       imageTransform: normalizeImageTransform(q.imageTransform),

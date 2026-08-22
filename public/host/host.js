@@ -66,7 +66,7 @@ async function loadPacks() {
     const data = await res.json();
     questionFiles = data.files || [];
   } catch {
-    questionFiles = ['pack-1.json'];
+    questionFiles = ['split-decision.json'];
   }
 }
 
@@ -166,27 +166,26 @@ function renderQuestion() {
         !answering
           ? `<div class="host-script" style="margin-bottom:0.75rem">
               <p class="muted" style="margin:0 0 0.4rem">
-                ${
-                  isOnePercent
-                    ? `${active.length} finalist${active.length === 1 ? '' : 's'} · TV is waiting.`
-                    : 'Only you can see this. TV is waiting.'
-                }
+                TV is showing the board. Read the question out loud, then start the timer.
               </p>
-              <p style="margin:0;font-weight:700;line-height:1.4">
-                Ask this question out loud, then say:
-                <span style="color:var(--club-gold,#ffd54a)">"Your time starts now."</span>
-              </p>
-              <p class="muted" style="margin:0.4rem 0 0">Tap Start right as you say it.</p>
             </div>`
           : ''
       }
-      <p style="font-weight:700;line-height:1.35">${escapeHtml(q?.prompt || '')}</p>
-      <p class="muted" style="margin-top:0.5rem">Accepted: ${(q?.accepted || []).map(escapeHtml).join(' · ')}</p>
+      <p style="font-weight:700;line-height:1.45;font-size:1.15rem;margin:0">${escapeHtml(q?.prompt || '')}</p>
+      ${
+        q?.image
+          ? `<div style="margin-top:0.75rem;border-radius:12px;overflow:hidden;border:1px solid rgba(255,213,74,0.35);background:#000">
+              <img src="${escapeHtml(q.image)}" alt="" style="display:block;width:100%;max-height:220px;object-fit:contain" />
+            </div>`
+          : ''
+      }
+      <p class="muted" style="margin-top:0.65rem">Accepted: ${(q?.accepted || []).map(escapeHtml).join(' · ')}</p>
       ${answering ? `<p class="muted">${lockedCount()} / ${active.length} locked · ${secs ?? '—'}s</p>` : ''}
       <div class="stack" style="margin-top:0.85rem">
         ${
           !answering
-            ? `<button class="btn-primary big-btn" data-act="start_answering">Start — "Your time starts now"</button>`
+            ? `<button class="btn-primary big-btn" data-act="start_answering">Start timer</button>
+               <p class="muted" style="margin:0.35rem 0 0;text-align:center">Say “Your time starts now” as you tap.</p>`
             : `<button class="btn-gold big-btn" data-act="end_answering">End round now</button>`
         }
       </div>

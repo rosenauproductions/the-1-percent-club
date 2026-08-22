@@ -654,7 +654,7 @@ body.display-body {
   max-height: min(58vh, 720px);
 }
 
-/* Full-bleed show boards (hidePrompt) — fill stage inside gold bezel */
+/* Full-bleed show boards — fill stage inside gold bezel at 95% */
 body.image-board-mode .top-bar,
 body.image-board-mode .arena-bg {
   display: none;
@@ -675,9 +675,15 @@ body.image-board-mode .main {
   overflow: hidden;
 }
 
-.image-board__img {
+.image-board__frame {
   position: absolute;
-  inset: 0;
+  inset: 2.5%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.image-board__img {
   width: 100%;
   height: 100%;
   object-fit: contain;
@@ -692,29 +698,119 @@ body.image-board-mode .main {
   z-index: 2;
 }
 
-.image-board__meta {
+.image-board__locks {
   position: absolute;
-  right: calc(2 * var(--u));
-  bottom: calc(2 * var(--u));
-  display: flex;
-  align-items: center;
-  gap: calc(1.2 * var(--u));
+  right: calc(2.2 * var(--u));
+  bottom: calc(2.2 * var(--u));
   padding: calc(0.7 * var(--u)) calc(1.2 * var(--u));
   border-radius: calc(1 * var(--u));
   background: rgba(0, 0, 0, 0.72);
   border: 1px solid rgba(255, 213, 74, 0.45);
   box-shadow: 0 0 18px rgba(255, 213, 74, 0.25);
-}
-
-.image-board__meta .timer {
-  font-size: calc(3.2 * var(--u));
-  margin: 0;
-}
-
-.image-board__meta .lock-progress,
-.image-board__meta .elim-status {
   font-size: calc(1.5 * var(--u));
-  margin: 0;
+  font-weight: 700;
+  color: var(--club-cyan);
+}
+
+/* Circular % + LED timer ring (top-left) */
+.pct-timer {
+  --progress: 1;
+  position: absolute;
+  top: calc(2.2 * var(--u));
+  left: calc(2.2 * var(--u));
+  width: calc(16 * var(--u));
+  height: calc(16 * var(--u));
+  z-index: 3;
+}
+
+.pct-timer__leds {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: repeating-conic-gradient(
+    from -90deg,
+    #ffe27a 0deg 5.5deg,
+    rgba(40, 20, 10, 0.35) 5.5deg 9deg
+  );
+  -webkit-mask-image:
+    conic-gradient(
+      from -90deg,
+      #000 0 calc(var(--progress) * 360deg),
+      transparent calc(var(--progress) * 360deg) 360deg
+    ),
+    radial-gradient(circle, transparent 57%, #000 58% 72%, transparent 73%);
+  mask-image:
+    conic-gradient(
+      from -90deg,
+      #000 0 calc(var(--progress) * 360deg),
+      transparent calc(var(--progress) * 360deg) 360deg
+    ),
+    radial-gradient(circle, transparent 57%, #000 58% 72%, transparent 73%);
+  -webkit-mask-composite: source-in;
+  mask-composite: intersect;
+  filter: drop-shadow(0 0 calc(0.55 * var(--u)) rgba(255, 213, 74, 0.9));
+  box-shadow: inset 0 0 0 calc(0.2 * var(--u)) rgba(201, 162, 39, 0.9);
+}
+
+.pct-timer__face {
+  position: absolute;
+  inset: 16%;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 35% 28%, rgba(140, 80, 220, 0.5), transparent 55%),
+    radial-gradient(circle at 50% 50%, #2a1458 0%, #12082a 70%, #080414 100%);
+  border: calc(0.38 * var(--u)) solid #d4af37;
+  box-shadow:
+    inset 0 0 calc(1.2 * var(--u)) rgba(255, 220, 120, 0.28),
+    0 0 calc(0.9 * var(--u)) rgba(255, 200, 60, 0.4),
+    0 0 0 calc(0.18 * var(--u)) rgba(255, 240, 180, 0.55);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: calc(0.15 * var(--u));
+}
+
+.pct-timer__percent {
+  font-family: var(--font-display);
+  font-size: calc(4.2 * var(--u));
+  line-height: 1;
+  color: #fff8e7;
+  text-shadow:
+    0 2px 0 rgba(80, 40, 0, 0.55),
+    0 0 12px rgba(255, 200, 80, 0.45);
+  letter-spacing: 0.02em;
+}
+
+.pct-timer__secs {
+  font-size: calc(1.55 * var(--u));
+  font-weight: 800;
+  color: var(--club-gold);
+  letter-spacing: 0.08em;
+}
+
+.pct-timer__hint {
+  font-size: calc(1.05 * var(--u));
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  color: rgba(255, 230, 160, 0.75);
+}
+
+.pct-timer--warn .pct-timer__leds {
+  background: repeating-conic-gradient(
+    from -90deg,
+    #ff5a5a 0deg 5.5deg,
+    rgba(40, 10, 10, 0.35) 5.5deg 9deg
+  );
+  filter: drop-shadow(0 0 calc(0.7 * var(--u)) rgba(255, 80, 80, 0.95));
+}
+
+.pct-timer--warn .pct-timer__secs {
+  color: #ff6b6b;
+}
+
+.pct-timer--hold .pct-timer__leds {
+  opacity: 0.9;
 }
 
 .elim-status {
