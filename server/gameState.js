@@ -29,11 +29,45 @@ export function makePlayerId() {
   return `p_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
+/** @typedef {'text'|'number'|'letter'|'ab'|'abc'|'abcd'} AnswerType */
+
+const LETTER_TYPE_COUNT = { ab: 2, abc: 3, abcd: 4 };
+
+export function normalizeAnswerType(raw, choices = []) {
+  const s = String(raw ?? '')
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z]/g, '');
+  if (
+    s === 'text' ||
+    s === 'number' ||
+    s === 'letter' ||
+    s === 'ab' ||
+    s === 'abc' ||
+    s === 'abcd'
+  ) {
+    return s;
+  }
+  const n = Array.isArray(choices) ? choices.length : 0;
+  if (n === 2) return 'ab';
+  if (n === 4) return 'abcd';
+  if (n >= 3) return 'abc';
+  if (n > 0) return 'abc';
+  return 'text';
+}
+
+/** Letter labels for AB / ABC / ABCD pads. */
+export function lettersForAnswerType(answerType) {
+  const n = LETTER_TYPE_COUNT[answerType] || 0;
+  return Array.from({ length: n }, (_, i) => String.fromCharCode(65 + i));
+}
+
 export function normalizeAnswer(text) {
   return String(text ?? '')
     .toLowerCase()
     .normalize('NFKD')
     .replace(/[\u0300-\u036f]/g, '')
+    .replace(/,/g, '') // allow 1,776 → 1776
     .replace(/[^a-z0-9\s]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
@@ -49,8 +83,36 @@ function canonicalizeAnswer(text) {
   return n;
 }
 
+function editDistance(a, b) {
+  const m = a.length;
+  const n = b.length;
+  if (!m) return n;
+  if (!n) return m;
+  const row = Array.from({ length: n + 1 }, (_, j) => j);
+  for (let i = 1; i <= m; i++) {
+    let prev = row[0];
+    row[0] = i;
+    for (let j = 1; j <= n; j++) {
+      const tmp = row[j];
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      row[j] = Math.min(row[j] + 1, row[j - 1] + 1, prev + cost);
+      prev = tmp;
+    }
+  }
+  return row[n];
+}
+
+function fuzzyCloseEnough(given, accepted) {
+  if (!given || !accepted) return false;
+  if (given === accepted) return true;
+  const maxLen = Math.max(given.length, accepted.length);
+  if (maxLen < 5) return false;
+  const allow = maxLen <= 7 ? 1 : maxLen <= 11 ? 2 : 3;
+  return editDistance(given, accepted) <= allow;
+}
+
 /** Expand accepted aliases (letters, option labels, matching choice text only). */
-export function expandAcceptedAnswers(accepted, choices = []) {
+export function expandAcceptedAnswers(accepted, choices = [], answerType = 'text') {
   const out = new Set();
   const add = (v) => {
     const s = String(v ?? '').trim();
@@ -60,13 +122,22 @@ export function expandAcceptedAnswers(accepted, choices = []) {
   for (const a of list) add(a);
 
   const acceptedNorm = list.map(canonicalizeAnswer).filter(Boolean);
+  const letterPads = lettersForAnswerType(answerType);
+  const choiceList =
+    choices?.length > 0
+      ? choices
+      : letterPads.length
+        ? letterPads
+        : [];
 
-  (choices ?? []).forEach((text, idx) => {
+  choiceList.forEach((text, idx) => {
     const L = String.fromCharCode(65 + idx);
+    if (letterPads.length && idx >= letterPads.length) return;
     const textN = canonicalizeAnswer(text);
     const letterOk = acceptedNorm.includes(L.toLowerCase());
     const textOk =
       !!textN &&
+      textN !== L.toLowerCase() &&
       acceptedNorm.some(
         (n) =>
           n === textN ||
@@ -77,7 +148,7 @@ export function expandAcceptedAnswers(accepted, choices = []) {
       add(L.toLowerCase());
       add(`option ${L}`);
       add(`option ${L.toLowerCase()}`);
-      add(text);
+      if (textN && textN !== L.toLowerCase()) add(text);
     }
   });
 
@@ -95,12 +166,38 @@ export function expandAcceptedAnswers(accepted, choices = []) {
   return [...out];
 }
 
-export function answersMatch(given, acceptedList) {
+export function answersMatch(given, acceptedList, opts = {}) {
+  const answerType = opts.answerType || 'text';
+  const fuzzy = opts.fuzzy === true;
   const n = canonicalizeAnswer(given);
   if (!n) return false;
   const accepted = (acceptedList ?? []).map(canonicalizeAnswer).filter(Boolean);
+  if (!accepted.length) return false;
+
+  if (answerType === 'letter') {
+    const letter = n
+      .replace(/^the\s+/, '')
+      .replace(/^letter\s+/, '')
+      .replace(/\s+/g, '');
+    const g = letter.length === 1 ? letter : letter.slice(0, 1);
+    return accepted.some((a) => {
+      const al = a.replace(/^the\s+/, '').replace(/^letter\s+/, '').replace(/\s+/g, '');
+      return al === g || al === letter;
+    });
+  }
+
   if (accepted.some((a) => a === n)) return true;
-  // Longer free-text only — never let a single letter fuzzy-match inside a word
+
+  // Digits-only compare (commas already stripped in normalize)
+  const digits = (s) => s.replace(/\s+/g, '');
+  const gd = digits(n);
+  if (/^\d+$/.test(gd) && accepted.some((a) => digits(a) === gd)) return true;
+
+  if (fuzzy) {
+    return accepted.some((a) => a.length >= 5 && fuzzyCloseEnough(n.replace(/\s+/g, ''), a.replace(/\s+/g, '')));
+  }
+
+  // Longer free-text: contain match (not for short letter keys)
   if (n.length >= 4) {
     return accepted.some(
       (a) => a.length >= 4 && (a.includes(n) || n.includes(a)),
@@ -449,12 +546,14 @@ export function startGame(state, questions, packName = null, packSettings = null
     const choices = Array.isArray(q.choices)
       ? q.choices.map((c) => String(c)).filter(Boolean).slice(0, 6)
       : [];
+    const answerType = normalizeAnswerType(q.answerType ?? q.input ?? q.mode, choices);
+    const fuzzy = q.fuzzy === true;
     const rawAccepted = Array.isArray(q.accepted)
       ? q.accepted
       : Array.isArray(q.answers)
         ? q.answers
         : [q.answer].filter(Boolean);
-    const accepted = expandAcceptedAnswers(rawAccepted, choices);
+    const accepted = expandAcceptedAnswers(rawAccepted, choices, answerType);
     return {
       index: i,
       percent: pct,
@@ -466,6 +565,8 @@ export function startGame(state, questions, packName = null, packSettings = null
       solutionImage: q.solutionImage || null,
       imageTransform: normalizeImageTransform(q.imageTransform),
       solutionImageTransform: normalizeImageTransform(q.solutionImageTransform),
+      answerType,
+      fuzzy,
       choices,
       accepted,
     };
@@ -668,60 +769,85 @@ export function usePass(state, playerId) {
 }
 
 export function hostOverride(state, playerId, correct) {
-  if (state.phase !== 'reveal' && state.phase !== 'answering') {
-    throw new Error('Override only during answering/reveal');
-  }
-  // If still answering, just mark override flag for grading
+  // During answering: stamp force flags for grading
   if (state.phase === 'answering') {
     const ans = state.answers[playerId] ?? { text: '', locked: true, usedPass: false };
-    return {
-      ...state,
-      answers: {
-        ...state.answers,
-        [playerId]: { ...ans, locked: true, forceCorrect: !!correct, forceWrong: !correct },
+    return actionMeta(
+      {
+        ...state,
+        answers: {
+          ...state.answers,
+          [playerId]: {
+            ...ans,
+            locked: true,
+            forceCorrect: !!correct,
+            forceWrong: !correct,
+          },
+        },
       },
-    };
+      'host_override',
+      { playerId, correct: !!correct },
+    );
   }
 
-  // During reveal: flip result and adjust jackpot/status
-  if (!state.reveal) throw new Error('No reveal data');
+  // After grading: allow umpire flips whenever reveal results exist
+  if (!state.reveal?.results) {
+    throw new Error('Override only during answering or after grading');
+  }
   const result = state.reveal.results.find((r) => r.playerId === playerId);
   if (!result) throw new Error('Player not in results');
   if (result.usedPass) throw new Error('Cannot override a pass');
 
   const wasCorrect = result.correct;
-  if (wasCorrect === correct) return state;
+  if (wasCorrect === !!correct) return state;
 
   let jackpot = state.jackpot;
   const players = state.players.map((p) => {
     if (p.id !== playerId) return p;
     if (correct) {
-      // resurrect
       if (p.stakeInJackpot) jackpot = Math.max(0, jackpot - STAKE);
       return { ...p, status: 'active', stakeInJackpot: false };
     }
-    // eliminate
     if (!p.stakeInJackpot) jackpot += STAKE;
     return { ...p, status: 'out', stakeInJackpot: true };
   });
 
   const results = state.reveal.results.map((r) =>
-    r.playerId === playerId ? { ...r, correct, timedOut: false } : r,
+    r.playerId === playerId ? { ...r, correct: !!correct, timedOut: false } : r,
   );
+
+  let elimination = state.elimination;
+  if (elimination?.wrongIds) {
+    let wrongIds = [...elimination.wrongIds];
+    let revealedIds = [...(elimination.revealedIds || [])];
+    if (correct) {
+      wrongIds = wrongIds.filter((id) => id !== playerId);
+      revealedIds = revealedIds.filter((id) => id !== playerId);
+    } else if (!wrongIds.includes(playerId)) {
+      wrongIds.push(playerId);
+    }
+    elimination = {
+      ...elimination,
+      wrongIds,
+      revealedIds,
+      revealedCount: revealedIds.length,
+    };
+  }
 
   let next = {
     ...state,
     jackpot,
     players,
+    elimination,
     reveal: {
       ...state.reveal,
       results,
       eliminated: results.filter((r) => !r.correct).length,
       survived: results.filter((r) => r.correct).length,
+      wrongIds: elimination?.wrongIds || state.reveal.wrongIds,
     },
   };
 
-  // Recalculate pending
   const survivors = players.filter((p) => p.status === 'active');
   if (survivors.length === 0) {
     next.pendingAfterReveal =
@@ -731,7 +857,7 @@ export function hostOverride(state, playerId, correct) {
   else if (state.questionIndex === FIVE_PERCENT_INDEX) next.pendingAfterReveal = 'final_choice';
   else next.pendingAfterReveal = 'next_question';
 
-  return actionMeta(next, 'host_override', { playerId, correct });
+  return actionMeta(next, 'host_override', { playerId, correct: !!correct });
 }
 
 export function endAnsweringWithForces(state) {
@@ -761,7 +887,10 @@ export function endAnsweringWithForces(state) {
     let correct;
     if (ans?.forceCorrect) correct = true;
     else if (ans?.forceWrong) correct = false;
-    else correct = !timedOut && answersMatch(ans?.text, q.accepted);
+    else correct = !timedOut && answersMatch(ans?.text, q.accepted, {
+      answerType: q.answerType,
+      fuzzy: q.fuzzy,
+    });
 
     results.push({
       playerId: p.id,

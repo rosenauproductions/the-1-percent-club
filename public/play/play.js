@@ -246,8 +246,8 @@ let answeringViewKey = '';
 
 function answeringKey() {
   const p = me();
-  const choiceCount = state?.currentQuestion?.choices?.length || 0;
-  return `${state?.phase}:${state?.questionIndex}:${state?.myAnswer?.locked || state?.answers?.[playerId]?.locked || false}:${!!p?.hasPass}:${!!p?.usedPass}:${joinError}:${choiceCount}`;
+  const mode = state?.currentQuestion?.answerType || 'text';
+  return `${state?.phase}:${state?.questionIndex}:${state?.myAnswer?.locked || state?.answers?.[playerId]?.locked || false}:${!!p?.hasPass}:${!!p?.usedPass}:${joinError}:${mode}`;
 }
 
 function updateTimerOnly() {
@@ -323,9 +323,12 @@ function renderAnswering() {
   if (existing) answerDraft = existing.value;
   answeringViewKey = key;
 
-  const choices = Array.isArray(q?.choices) ? q.choices : [];
-  const isChoiceQuestion = choices.length > 0;
-  const choiceLetters = choices.map((_, i) => String.fromCharCode(65 + i));
+  const answerType = q?.answerType || 'text';
+  const letterModes = { ab: ['A', 'B'], abc: ['A', 'B', 'C'], abcd: ['A', 'B', 'C', 'D'] };
+  const choiceLetters = letterModes[answerType] || null;
+  const isChoiceQuestion = !!choiceLetters;
+  const isNumber = answerType === 'number';
+  const isLetter = answerType === 'letter';
 
   const answerControls = isChoiceQuestion
     ? `<div class="choice-pad" id="choicePad" role="group" aria-label="Answer choices">
@@ -336,10 +339,18 @@ function renderAnswering() {
           })
           .join('')}
       </div>
-      <p class="muted choice-pad__hint">Tap A${choiceLetters.length > 2 ? '–' + choiceLetters[choiceLetters.length - 1] : ' or B'} to lock in</p>
+      <p class="muted choice-pad__hint">Tap ${
+        choiceLetters.length === 2
+          ? 'A or B'
+          : `A–${choiceLetters[choiceLetters.length - 1]}`
+      } to lock in</p>
       <p class="error" id="answerError" style="display:${joinError ? 'block' : 'none'}">${escapeHtml(joinError || '')}</p>`
     : `<label class="field">Your answer
-          <input id="answerInput" type="text" inputmode="text" maxlength="80" placeholder="Type your answer" autocomplete="off" enterkeyhint="done" />
+          <input id="answerInput" type="text" inputmode="${
+            isNumber ? 'decimal' : isLetter ? 'text' : 'text'
+          }" maxlength="${isLetter ? '3' : '80'}" placeholder="${
+            isNumber ? 'Number or word' : isLetter ? 'Letter' : 'Type your answer'
+          }" autocomplete="off" enterkeyhint="done" ${isLetter ? 'autocapitalize="characters"' : ''} />
         </label>
         <p class="error" id="answerError" style="display:${joinError ? 'block' : 'none'}">${escapeHtml(joinError || '')}</p>
         <button class="btn-primary big-btn" id="lockBtn">Lock in</button>`;

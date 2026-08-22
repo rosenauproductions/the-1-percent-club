@@ -7,8 +7,8 @@
     {
       "percent": 90,
       "prompt": "Logically, based solely on their names, which celebrity belongs on this guest list?",
-      "choices": ["A", "B", "C"],
-      "accepted": ["C", "c", "option C", "Bad Bunny", "bad bunny", "BadBunny", "badbunny"],
+      "answerType": "abc",
+      "accepted": ["C", "Bad Bunny", "bad bunny", "BadBunny"],
       "explanation": "It's a list of celebrities whose second/last name is an animal.",
       "image": "90a.png",
       "solutionImage": "90b.png"
@@ -16,7 +16,8 @@
     {
       "percent": 80,
       "prompt": "Which pizza has more slices?",
-      "accepted": ["B", "b", "option B", "12", "12 inch", "12\"", "12-inch", "rectangular", "the rectangular one", "the smaller one", "12 inch rectangular"],
+      "answerType": "ab",
+      "accepted": ["B", "12", "12 inch", "rectangular", "the rectangular one"],
       "explanation": "The rectangular pizza has 7 large slices and 4 smaller ones, for a total of 11, and the round one only has 8.",
       "image": "80a.png",
       "solutionImage": "80b.png"
@@ -24,7 +25,8 @@
     {
       "percent": 70,
       "prompt": "These triplets like to wear similar clothing but with subtle differences so people can tell them apart. Which triplet is wearing this exact outfit?",
-      "accepted": ["B", "b", "option B", "the middle one"],
+      "answerType": "abc",
+      "accepted": ["B", "the middle one"],
       "explanation": "In A the scarf is different colors. In C the scarf fringe is much shorter and the sweater cuffs are a different color.",
       "image": "70a.png",
       "solutionImage": "70b.png"
@@ -32,7 +34,8 @@
     {
       "percent": 60,
       "prompt": "Which of these pictures could not have been created with these puzzle pieces?",
-      "accepted": ["D", "d", "option D", "Rocket", "rocket", "the rocket"],
+      "answerType": "abcd",
+      "accepted": ["D", "Rocket", "the rocket"],
       "explanation": "The rocket has extra pieces that do not exist in the original.",
       "image": "60a.png",
       "solutionImage": "60b.png"
@@ -40,7 +43,8 @@
     {
       "percent": 50,
       "prompt": "Which of these license plates is using numbers in a different way from the other two?",
-      "accepted": ["C", "c", "option C", "1RONM4N", "ironman", "iron man"],
+      "answerType": "abc",
+      "accepted": ["C", "1RONM4N", "ironman", "iron man"],
       "explanation": "LUV4EVA and 1DERFUL substitute the numbers for a syllable based on how they sound. 1RONM4N uses letters based on how they look—1 for I, 4 for A.",
       "image": "50a.png",
       "solutionImage": "50b.png"
@@ -48,7 +52,8 @@
     {
       "percent": 45,
       "prompt": "Which of these nonsense collections of words is not a STATEment?",
-      "accepted": ["B", "b", "option B", "FLORAL INCOME GAVE RIND", "floral income gave rind"],
+      "answerType": "abc",
+      "accepted": ["B", "FLORAL INCOME GAVE RIND", "floral income gave rind"],
       "explanation": "All of these statements are made up of two-letter state abbreviations, except for the VE in GAVE.",
       "image": "45a.png",
       "solutionImage": "45b.png"
@@ -56,7 +61,8 @@
     {
       "percent": 40,
       "prompt": "I have a stack of colorful paper clips and rubber bands, which are shaped like this. How many paper clips can be seen in the stack?",
-      "accepted": ["7", "seven", "Seven", "7 paper clips", "seven paper clips"],
+      "answerType": "number",
+      "accepted": ["7", "seven"],
       "explanation": "Count only the shapes with the internal paper-clip loop — there are 7.",
       "image": "40a.png",
       "solutionImage": "40b.png"
@@ -64,7 +70,8 @@
     {
       "percent": 35,
       "prompt": "The following people are all in a club that's based solely on a unique aspect of their name. The members are William Elcome, Gerard Reeting, and Rhonda Egards. Logically, which of these celebrities could be a member of their club?",
-      "accepted": ["B", "b", "option B", "Tom Hanks", "tom hanks", "Hanks", "THANKS"],
+      "answerType": "abcd",
+      "accepted": ["B", "Tom Hanks", "Hanks", "THANKS"],
       "explanation": "All of the names become words when the first initial is added to the last name. William Elcome is WELCOME, Gerard Reeting is GREETING, Rhonda Egards is REGARDS, and Tom Hanks is THANKS.",
       "image": "35a.png",
       "solutionImage": "35b.png"
@@ -72,7 +79,8 @@
     {
       "percent": 30,
       "prompt": "A time traveler from the year 6177 wanted to travel back in time, but her time machine can only send her back to the closest year in the past that uses all four of those exact digits. What year can she visit?",
-      "accepted": ["1776", "1,776", "seventeen seventy six", "seventeen seventy-six"],
+      "answerType": "number",
+      "accepted": ["1776", "seventeen seventy six", "seventeen seventy-six"],
       "explanation": "No other combination of those four numbers results in a more recent year in the past.",
       "image": "30a.png",
       "solutionImage": "30b.png"
@@ -80,7 +88,8 @@
     {
       "percent": 25,
       "prompt": "What is the answer to the question written on the cut-out piece of paper?",
-      "accepted": ["E", "e", "letter E", "letter e", "the letter E"],
+      "answerType": "letter",
+      "accepted": ["E"],
       "explanation": "The question is 'WHAT LETTER APPEARS MOST OFTEN ON THIS PIECE OF PAPER?' E appears 7 times.",
       "image": "25a.png",
       "solutionImage": "25b.png"
@@ -88,7 +97,9 @@
     {
       "percent": 20,
       "prompt": "If you rearranged the words in this fascinating question so that the words with the fewest total letters were first and the word with the most letters was last, which word would then be second to last?",
-      "accepted": ["Rearranged", "rearranged", "REARRANGED"],
+      "answerType": "text",
+      "fuzzy": true,
+      "accepted": ["Rearranged"],
       "explanation": "'Fascinating' has 11 letters so that would go last. 'Rearranged' has the second most letters, with 10, so it would go second to last.",
       "image": "20a.png",
       "solutionImage": "20b.png"
@@ -96,7 +107,8 @@
     {
       "percent": 15,
       "prompt": "Adding the correct three letters to the blanks before each of these groups of letters will give you 4 connected words. What three letters should replace the red question marks to make the first word in this well-known group?",
-      "accepted": ["WIN", "win", "Win", "W I N"],
+      "answerType": "text",
+      "accepted": ["WIN", "W I N"],
       "explanation": "The graphic shows the right half of the four seasons. So the letters that belong before 'TER' are 'WIN'.",
       "image": "15a.png",
       "solutionImage": "15b.png"
@@ -104,7 +116,9 @@
     {
       "percent": 10,
       "prompt": "Charlie can pull an unlimited number of the five letters pictured here out of his magic hat. What is the longest word he could conjure with this trick?",
-      "accepted": ["ABRACADABRA", "abracadabra", "Abracadabra"],
+      "answerType": "text",
+      "fuzzy": true,
+      "accepted": ["ABRACADABRA"],
       "explanation": "The 11-letter word uses 5 A's, 2 B's, 2 R's, 1 D, and 1 C.",
       "image": "10a.png",
       "solutionImage": "10b.png"
@@ -112,7 +126,8 @@
     {
       "percent": 5,
       "prompt": "Each of these numbers has the exact same amount of a given thing. Logically, what number should come next in this sequence?",
-      "accepted": ["12", "twelve", "Twelve", "TWELVE"],
+      "answerType": "number",
+      "accepted": ["12", "twelve"],
       "explanation": "Each of the words has two, and only two, vowels. The next number with two vowels is twelve.",
       "image": "5a.png",
       "solutionImage": "5b.png"
@@ -120,7 +135,8 @@
     {
       "percent": 1,
       "prompt": "To build a snowman, I need one carrot, one hat, two sticks, and two rocks. I have twice as many hats as rocks, twice as many sticks as hats, and twice as many carrots as sticks. I make two snowmen and then I'm out of rocks. How many carrots do I have left?",
-      "accepted": ["30", "thirty", "Thirty", "30 carrots"],
+      "answerType": "number",
+      "accepted": ["30", "thirty"],
       "explanation": "To make two snowmen with no rocks left over, I must have started with 4 rocks, which means I had 8 hats, 16 sticks, and 32 carrots. Two carrots were used for the snowmen, so I have 30 left.",
       "image": "1a.png",
       "solutionImage": "1b.png"

@@ -179,7 +179,9 @@ function renderQuestion() {
             </div>`
           : ''
       }
-      <p class="muted" style="margin-top:0.65rem">Accepted: ${(q?.accepted || []).map(escapeHtml).join(' · ')}</p>
+      <p class="muted" style="margin-top:0.65rem">Type: <strong>${escapeHtml(q?.answerType || 'text')}</strong>${
+        q?.fuzzy ? ' · fuzzy spelling' : ''
+      } · Accepted: ${(q?.accepted || []).map(escapeHtml).join(' · ')}</p>
       ${answering ? `<p class="muted">${lockedCount()} / ${active.length} locked · ${secs ?? '—'}s</p>` : ''}
       <div class="stack" style="margin-top:0.85rem">
         ${
@@ -192,13 +194,32 @@ function renderQuestion() {
     </div>
     ${
       answering
-        ? `<div class="card"><h2>Live locks</h2>
+        ? `<div class="card"><h2>Live answers · umpire</h2>
+            <p class="muted" style="margin:0 0 0.65rem">You see every lock. Mark correct if the server is being picky.</p>
             <ul class="answer-list">
               ${active
                 .map((p) => {
                   const a = state.answers[p.id];
-                  return `<li><div class="name">${escapeHtml(p.name)}</div>
-                    <div class="text">${a?.locked ? (a.usedPass ? '(PASS)' : escapeHtml(a.text)) : '…thinking'}</div></li>`;
+                  const forced =
+                    a?.forceCorrect === true
+                      ? ' · forced ✓'
+                      : a?.forceWrong === true
+                        ? ' · forced ✗'
+                        : '';
+                  return `<li>
+                    <div class="name">${escapeHtml(p.name)}${escapeHtml(forced)}</div>
+                    <div class="text">${
+                      a?.locked ? (a.usedPass ? '(PASS)' : escapeHtml(a.text || '—')) : '…thinking'
+                    }</div>
+                    ${
+                      a?.locked && !a.usedPass
+                        ? `<div style="display:flex;gap:0.4rem;margin-top:0.35rem;flex-wrap:wrap">
+                            <button type="button" class="btn-ghost" style="padding:0.3rem 0.55rem;font-size:0.75rem" data-override="${escapeHtml(p.id)}" data-correct="1">Count correct</button>
+                            <button type="button" class="btn-ghost" style="padding:0.3rem 0.55rem;font-size:0.75rem;opacity:0.7" data-override="${escapeHtml(p.id)}" data-correct="0">Force wrong</button>
+                          </div>`
+                        : ''
+                    }
+                  </li>`;
                 })
                 .join('')}
             </ul></div>`
@@ -225,13 +246,14 @@ function renderReveal() {
   `;
 }
 
-/** Host roast sheet — wrong answers first and loud. */
+/** Host roast sheet — wrong answers first; umpire can force correct. */
 function renderRoastLists() {
   const r = state.reveal;
   const results = r?.results || [];
   const wrongs = results.filter((row) => !row.correct);
   const safes = results.filter((row) => row.correct);
-  const accepted = (r?.accepted || []).slice(0, 4).join(' · ') || '—';
+  const accepted = (r?.accepted || []).slice(0, 6).join(' · ') || '—';
+  const canUmpire = !!r?.results?.length;
 
   return `
     <p class="roast-correct muted" style="margin-top:0.65rem">
@@ -251,6 +273,13 @@ function renderRoastLists() {
                         ? '<em>(no answer)</em>'
                         : `“${escapeHtml(row.text)}”`
                     }</div>
+                    ${
+                      canUmpire && !row.usedPass
+                        ? `<button type="button" class="btn-ghost" style="margin-top:0.35rem;padding:0.35rem 0.6rem;font-size:0.8rem" data-override="${escapeHtml(row.playerId)}" data-correct="1">
+                            Umpire: count as correct
+                          </button>`
+                        : ''
+                    }
                   </li>`,
                 )
                 .join('')}
@@ -268,6 +297,13 @@ function renderRoastLists() {
                   (row) => `<li>
                     <div class="name ok">${escapeHtml(row.name)} ✓</div>
                     <div class="text">${escapeHtml(row.text || '—')}</div>
+                    ${
+                      canUmpire && !row.usedPass
+                        ? `<button type="button" class="btn-ghost" style="margin-top:0.35rem;padding:0.35rem 0.6rem;font-size:0.75rem;opacity:0.75" data-override="${escapeHtml(row.playerId)}" data-correct="0">
+                            Umpire: mark wrong
+                          </button>`
+                        : ''
+                    }
                   </li>`,
                 )
                 .join('')}
@@ -494,16 +530,13 @@ function render() {
           <div class="card">
             <h2>Time’s up · ${r?.percent ?? '?'}%</h2>
             <div class="host-script" style="margin:0.75rem 0;font-weight:700;line-height:1.45">
-              <p style="margin:0 0 0.5rem">Say something like:</p>
+              <p style="margin:0 0 0.5rem">Check answers first — umpire if needed — then:</p>
               <p style="margin:0;color:var(--club-gold,#ffd54a)">
                 “Let’s see who got it right…”
               </p>
-              <p class="muted" style="margin:0.65rem 0 0;font-weight:600">
-                Then hit the button — suspense lights, then thumps. You’ll get the wrong answers
-                <em>after</em> we see who’s left.
-              </p>
             </div>
-            <p class="muted">${r?.eliminated ?? 0} will be going out · ${r?.survived ?? 0} safe (don’t spoil yet)</p>
+            ${renderRoastLists()}
+            <p class="muted" style="margin-top:0.75rem">${r?.eliminated ?? 0} marked out · ${r?.survived ?? 0} safe</p>
             <button class="btn-primary big-btn" style="margin-top:0.85rem" data-act="show_results">
               Let’s see who got it right
             </button>
