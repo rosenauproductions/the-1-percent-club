@@ -118,6 +118,10 @@ function startTimerTick() {
     const total = answerSecondsTotal();
     const badge = document.getElementById('pctTimerBadge');
     if (badge) {
+      if (secs != null && secs <= 0) {
+        badge.remove();
+        return;
+      }
       const progress = secs == null ? 1 : Math.max(0, secs) / total;
       badge.style.setProperty('--progress', progress.toFixed(4));
       badge.classList.toggle('pct-timer--warn', secs !== null && secs <= 5);
@@ -137,7 +141,7 @@ function startTimerTick() {
       const locked = Object.values(state.answers || {}).filter((a) => a.locked).length;
       lock.textContent = `${locked} / ${active} locked in`;
     }
-    if (!el && !badge) render();
+    if (!el && !badge && !(secs != null && secs <= 0)) render();
   }, 200);
 }
 
@@ -218,8 +222,9 @@ function answerSecondsTotal() {
   return state?.setup?.answerSeconds || 30;
 }
 
-/** LED-ring badge: center = question %, ring = time remaining. */
+/** LED-ring badge: center = question %, ring = time remaining. Hidden when time hits 0. */
 function renderPctTimerBadge({ percent, secs, totalSecs, answering }) {
+  if (answering && secs != null && secs <= 0) return '';
   const total = Math.max(1, Number(totalSecs) || 30);
   const left = answering && secs != null ? Math.max(0, secs) : total;
   const progress = answering ? left / total : 1;
@@ -375,19 +380,9 @@ function renderEliminating() {
     renderFullBleedBoard({
       src: q.image,
       transform: q.imageTransform,
-      overlay: `
-        ${renderPctTimerBadge({
-          percent: q.percent,
-          secs: null,
-          totalSecs: answerSecondsTotal(),
-          answering: false,
-        })}
-        ${
-          statusLine
-            ? `<div class="image-board__locks elim-status ${sting ? 'elim-status--scan' : ''}">${escapeHtml(statusLine)}</div>`
-            : ''
-        }
-      `,
+      overlay: statusLine
+        ? `<div class="image-board__locks elim-status ${sting ? 'elim-status--scan' : ''}">${escapeHtml(statusLine)}</div>`
+        : '',
     });
     return;
   }
@@ -518,12 +513,6 @@ function renderAnswerReveal() {
     renderFullBleedBoard({
       src: solutionSrc,
       transform: solutionTransform,
-      overlay: renderPctTimerBadge({
-        percent: r?.percent ?? q?.percent,
-        secs: null,
-        totalSecs: answerSecondsTotal(),
-        answering: false,
-      }),
     });
     return;
   }
