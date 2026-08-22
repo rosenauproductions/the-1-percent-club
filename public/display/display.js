@@ -622,10 +622,11 @@ function renderCashout() {
 
 function renderFinalChoice() {
   const active = state.players.filter((p) => p.status === 'active');
+  const offer = Math.floor((Number(state.jackpot) || 0) / 2);
   main.innerHTML = `
     <div class="center-phase">
-      <h1>TAKE <span class="pct">$10,000</span> OR GO FOR <span class="pct">1%</span>?</h1>
-      <p>${active.length} finalist${active.length === 1 ? '' : 's'} · jackpot ${money(state.jackpot)}</p>
+      <h1>TAKE <span class="pct">${money(offer)}</span> OR GO FOR <span class="pct">1%</span>?</h1>
+      <p>${active.length} finalist${active.length === 1 ? '' : 's'} · pot ${money(state.jackpot)} · offer is half</p>
       <p>Anyone who stays faces the 1% question — one player or a full table.</p>
       <div class="side-grid" style="width:70%;max-height:40%">${renderSeatGrid(active)}</div>
     </div>
@@ -634,11 +635,12 @@ function renderFinalChoice() {
 
 function renderSolo() {
   const solo = state.players.find((p) => p.status === 'active');
+  const offer = Math.floor((Number(state.jackpot) || 0) / 2);
   main.innerHTML = `
     <div class="center-phase">
       <h1>ONE LEFT</h1>
-      <p><strong>${escapeHtml(solo?.name ?? '')}</strong> — take $10,000 or face the 1% question?</p>
-      <p>Jackpot: ${money(state.jackpot)}</p>
+      <p><strong>${escapeHtml(solo?.name ?? '')}</strong> — take ${money(offer)} (half the pot) or face the 1% question?</p>
+      <p>Prize pot: ${money(state.jackpot)}</p>
     </div>
   `;
 }
@@ -660,7 +662,7 @@ function renderFinale() {
         ${winners
           .map((p) => {
             let tag = '';
-            if (p.status === 'took10k') tag = ' (took $10k)';
+            if (p.status === 'took10k') tag = ` (took ${money(p.winnings)})`;
             else if (p.status === 'cashed') tag = ' (cashed out)';
             else if (p.status === 'out') tag = ' (kept $1k bonus)';
             return `<li>${escapeHtml(p.name)} · ${money(p.winnings)}${tag}</li>`;

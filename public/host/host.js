@@ -338,31 +338,33 @@ function renderFinal() {
   const active = activePlayers();
   const awaiting = !!state._awaitingOnePercent;
   const took = (state.players || []).filter((p) => p.status === 'took10k');
+  const offer = Math.floor((Number(state.jackpot) || 0) / 2);
+  const offerLabel = money(awaiting ? state.finalOffer ?? offer : offer);
   main.innerHTML = `
     <div class="card">
-      <h2>Finalists · $10k or 1%?</h2>
-      <p class="muted">${active.length} still in · jackpot ${money(state.jackpot)}</p>
+      <h2>Finalists · half pot or 1%?</h2>
+      <p class="muted">${active.length} still in · pot ${money(state.jackpot)} · offer ${offerLabel}</p>
       ${
         awaiting
-          ? `<p class="muted">Decisions locked. ${took.length ? `${took.length} took $10k. ` : ''}Start the 1% when you’re ready.</p>
+          ? `<p class="muted">Decisions locked. ${took.length ? `${took.length} took the offer. ` : ''}Start the 1% when you’re ready.</p>
              <ul class="answer-list">
                ${active
                  .map((p) => `<li><div class="name ok">${escapeHtml(p.name)}</div><div class="text">GOING FOR 1%</div></li>`)
                  .join('')}
                ${took
-                 .map((p) => `<li><div class="name">${escapeHtml(p.name)}</div><div class="text">Took $10k</div></li>`)
+                 .map((p) => `<li><div class="name">${escapeHtml(p.name)}</div><div class="text">Took ${money(p.winnings)}</div></li>`)
                  .join('')}
              </ul>
              <button class="btn-primary big-btn" style="margin-top:0.85rem" data-act="start_one_percent">
                Start 1% question
              </button>`
-          : `<p class="muted">Wait for phones, then lock — you start the 1% question after.</p>
+          : `<p class="muted">Offer is half the pot (${offerLabel}), split if more than one takes it. Lock — then you start the 1%.</p>
              <ul class="answer-list">
                ${active
                  .map((p) => {
                    const d = state.finalDecisions?.[p.id];
                    return `<li><div class="name">${escapeHtml(p.name)}</div>
-                     <div class="text">${d === true ? 'TAKE $10k' : d === false ? 'GO FOR 1%' : '…deciding'}</div></li>`;
+                     <div class="text">${d === true ? `TAKE OFFER` : d === false ? 'GO FOR 1%' : '…deciding'}</div></li>`;
                  })
                  .join('')}
              </ul>
@@ -377,11 +379,12 @@ function renderFinal() {
 function renderSolo() {
   const solo = activePlayers()[0];
   const awaiting = state.soloDecision === 'one_percent' || state._awaitingOnePercent;
+  const offer = money(Math.floor((Number(state.jackpot) || 0) / 2));
   main.innerHTML = `
     <div class="card">
       <h2>Solo offer</h2>
       <p><strong>${escapeHtml(solo?.name || '')}</strong> is alone.</p>
-      <p class="muted">Jackpot ${money(state.jackpot)}</p>
+      <p class="muted">Pot ${money(state.jackpot)} · offer ${offer} (half)</p>
       ${
         awaiting
           ? `<p class="muted" style="margin-top:0.75rem">They chose the 1%. Start when you’re ready to read it.</p>
@@ -389,7 +392,7 @@ function renderSolo() {
                Start 1% question
              </button>`
           : `<div class="stack" style="margin-top:0.85rem">
-               <button class="btn-gold big-btn" data-solo="1">Take $10,000</button>
+               <button class="btn-gold big-btn" data-solo="1">Take ${offer}</button>
                <button class="btn-primary big-btn" data-solo="0">Choose 1% (host starts question)</button>
              </div>`
       }

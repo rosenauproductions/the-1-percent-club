@@ -422,20 +422,21 @@ function renderFinalChoice() {
   }
   const decided = state.finalDecisions?.[playerId];
   const awaiting = !!state._awaitingOnePercent;
+  const offer = money(Math.floor((Number(state.jackpot) || 0) / 2));
   main.innerHTML = `
     <div class="hero">
-      <h1>$10k or 1%?</h1>
-      <p>Jackpot is ${money(state.jackpot)}</p>
+      <h1>Half the pot or 1%?</h1>
+      <p>Pot ${money(state.jackpot)} · offer ${offer}</p>
     </div>
     <div class="card">
       ${
         awaiting
           ? `<p class="muted">You’re in for the 1%. Wait for the host to start the question.</p>`
           : decided !== undefined
-            ? `<p class="muted">You chose: <strong>${decided ? 'TAKE $10,000' : 'GO FOR 1%'}</strong></p>
+            ? `<p class="muted">You chose: <strong>${decided ? `TAKE ${offer}` : 'GO FOR 1%'}</strong></p>
                <p class="muted" style="margin-top:0.5rem">Waiting for the host…</p>`
             : `<div class="stack">
-                <button class="btn-gold big-btn" id="take10kBtn">Take share of $10,000</button>
+                <button class="btn-gold big-btn" id="take10kBtn">Take share of ${offer}</button>
                 <button class="btn-primary big-btn" id="go1Btn">Attempt the 1% question</button>
               </div>`
       }
@@ -449,18 +450,19 @@ function renderSolo() {
     return;
   }
   const decided = state.soloDecision;
+  const offer = money(Math.floor((Number(state.jackpot) || 0) / 2));
   main.innerHTML = `
     <div class="hero">
       <h1>You're the last one</h1>
-      <p>Jackpot ${money(state.jackpot)}</p>
+      <p>Pot ${money(state.jackpot)} · offer ${offer}</p>
     </div>
     <div class="card stack">
       ${
         decided === 'one_percent'
           ? `<p class="muted" style="text-align:center">You chose the 1%. Wait for the host to start.</p>`
           : decided === '10k'
-            ? `<p class="muted" style="text-align:center">You took $10,000.</p>`
-            : `<button class="btn-gold big-btn" id="solo10k">Take $10,000</button>
+            ? `<p class="muted" style="text-align:center">You took the offer.</p>`
+            : `<button class="btn-gold big-btn" id="solo10k">Take ${offer}</button>
                <button class="btn-primary big-btn" id="solo1">Go for 1%</button>`
       }
     </div>

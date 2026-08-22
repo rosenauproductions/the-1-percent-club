@@ -3,6 +3,11 @@
 
 export const STAKE = 1000;
 export const TEN_K = 10000;
+
+/** Final / solo buyout offer: half the current prize pot. */
+export function finalOfferAmount(state) {
+  return Math.floor(Math.max(0, Number(state?.jackpot) || 0) / 2);
+}
 export const ANSWER_SECONDS = 30;
 export const MAX_PLAYERS = 100;
 export const PERCENTAGES = [90, 80, 70, 60, 50, 45, 40, 35, 30, 25, 20, 15, 10, 5, 1];
@@ -1372,9 +1377,12 @@ export function resolveFinalChoice(state) {
   const leavers = actives.filter((p) => state.finalDecisions[p.id] === true);
   const stayers = actives.filter((p) => state.finalDecisions[p.id] !== true);
 
+  const offer = finalOfferAmount(state);
   let share = 0;
+  let paid = 0;
   if (leavers.length > 0) {
-    share = Math.floor(TEN_K / leavers.length);
+    share = Math.floor(offer / leavers.length);
+    paid = share * leavers.length;
   }
 
   const players = state.players.map((p) => {
@@ -1384,8 +1392,13 @@ export function resolveFinalChoice(state) {
     return p;
   });
 
+  const jackpot = Math.max(0, (Number(state.jackpot) || 0) - paid);
+
   if (stayers.length === 0) {
-    return actionMeta(cue({ ...state, players, phase: 'finale' }, 'win'), 'finale');
+    return actionMeta(
+      cue({ ...state, players, jackpot, phase: 'finale' }, 'win'),
+      'finale',
+    );
   }
 
   // Lock leavers out — host advances to the 1% question separately
@@ -1393,6 +1406,8 @@ export function resolveFinalChoice(state) {
     {
       ...state,
       players,
+      jackpot,
+      finalOffer: offer,
       _awaitingOnePercent: true,
     },
     'resolve_final',
@@ -1405,19 +1420,36 @@ export function soloDecide(state, take10k) {
   if (!solo) throw new Error('No solo player');
   if (state.soloDecision) throw new Error('Already decided');
 
+  const offer = finalOfferAmount(state);
+
   if (take10k) {
     const players = state.players.map((p) =>
-      p.id === solo.id ? { ...p, status: 'took10k', winnings: TEN_K } : p,
+      p.id === solo.id ? { ...p, status: 'took10k', winnings: offer } : p,
     );
     return actionMeta(
-      cue({ ...state, players, soloDecision: '10k', phase: 'finale' }, 'win'),
-      'solo_10k',
+      cue(
+        {
+          ...state,
+          players,
+          jackpot: Math.max(0, (Number(state.jackpot) || 0) - offer),
+          soloDecision: '10k',
+          finalOffer: offer,
+          phase: 'finale',
+        },
+        'win',
+      ),
+      'solo_offer_taken',
     );
   }
 
   // Record intent only — host starts the 1% question
   return actionMeta(
-    { ...state, soloDecision: 'one_percent', _awaitingOnePercent: true },
+    {
+      ...state,
+      soloDecision: 'one_percent',
+      finalOffer: offer,
+      _awaitingOnePercent: true,
+    },
     'solo_go_1pct',
   );
 }
