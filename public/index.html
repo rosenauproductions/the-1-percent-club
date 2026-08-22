@@ -49,9 +49,9 @@
 <body>
   <div class="wrap">
     <h1>THE <span>1%</span> CLUB</h1>
-    <p>Use the <strong>LAN IP</strong> links below on phones and the TV.</p>
+    <p>Open these on the TV and phones (same address you used to get here).</p>
     <div class="links" id="links">
-      <a class="card" href="/display/"><strong>TV DISPLAY</strong><span>Loading best URL…</span></a>
+      <a class="card" href="/display/"><strong>TV DISPLAY</strong><span>Loading…</span></a>
       <a class="card" href="/host/"><strong>HOST</strong><span>Loading…</span></a>
       <a class="card" href="/play/"><strong>PLAY</strong><span>Loading…</span></a>
       <a class="card" href="/qa/"><strong>QA BOARD</strong><span>Feedback</span></a>
@@ -59,19 +59,17 @@
     <p class="meta" id="meta">Checking server…</p>
   </div>
   <script type="module">
+    const base = location.origin.replace(/\/$/, '');
+    document.getElementById('links').innerHTML = `
+      <a class="card" href="${base}/display/"><strong>TV DISPLAY</strong><span>${base}/display/</span></a>
+      <a class="card" href="${base}/host/"><strong>HOST</strong><span>${base}/host/</span></a>
+      <a class="card" href="${base}/play/"><strong>PLAY</strong><span>${base}/play/</span></a>
+      <a class="card" href="${base}/qa/"><strong>QA BOARD</strong><span>${base}/qa/</span></a>
+    `;
     try {
-      const info = await fetch('/api/info').then((r) => r.json());
-      const primary = info.primary || location.origin;
-      document.getElementById('links').innerHTML = `
-        <a class="card" href="${primary}/display/"><strong>TV DISPLAY</strong><span>${primary}/display/</span></a>
-        <a class="card" href="${primary}/host/"><strong>HOST</strong><span>${primary}/host/</span></a>
-        <a class="card" href="${primary}/play/"><strong>PLAY</strong><span>${primary}/play/</span></a>
-        <a class="card" href="${primary}/qa/"><strong>QA BOARD</strong><span>${primary}/qa/</span></a>
-      `;
-      document.getElementById('meta').innerHTML =
-        `Server OK · LAN <code>${primary}</code>` +
-        (info.lanIps?.length ? ` · IPs: ${info.lanIps.join(', ')}` : '');
-    } catch (err) {
+      await fetch('/api/info').then((r) => r.json());
+      document.getElementById('meta').innerHTML = `Server OK · <code>${base}</code>`;
+    } catch {
       document.getElementById('meta').textContent = 'Could not reach /api/info — is the server running?';
     }
   </script>
