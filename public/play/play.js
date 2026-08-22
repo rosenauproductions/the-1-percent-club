@@ -724,12 +724,13 @@ function ensureScanTick() {
 
 function syncEliminationUi(p) {
   const elim = state?.elimination;
-  // Search hops phone-to-phone while eliminating.mp3 plays (even if nobody is wrong)
+  // Everyone still in flashes during search — correct answers included (suspense)
   const scanning =
     state?.phase === 'eliminating' &&
     elim?.stage === 'scanning' &&
     !!p &&
-    p.status === 'active';
+    p.status !== 'out' &&
+    !elim?.revealedIds?.includes(p.id);
   const spot = scanning ? scanSpotlightId(elim, state.players) : null;
   const onMe = !!(scanning && spot && spot === p.id);
   const searching =

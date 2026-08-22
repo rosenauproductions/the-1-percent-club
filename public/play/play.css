@@ -229,27 +229,41 @@ input[type='text'] {
   color: var(--text-muted);
 }
 
-/* Blue-light search — hops phone-to-phone (hit = lit, miss = dim suspense) */
+/* Blue-light search — EVERY active phone flashes (suspense), spotlight hits harder */
 body.play-body.elim-scanning {
-  transition: background 0.12s ease;
+  animation: elim-scan-cycle 0.85s ease-in-out infinite;
 }
 
 body.play-body.elim-scanning.elim-scan-miss {
-  background: #020617;
-  animation: none;
+  /* still flashing — just slightly dimmer than the current spotlight */
+  filter: brightness(0.92);
 }
 
 body.play-body.elim-scanning.elim-scan-hit {
-  background: radial-gradient(ellipse at 50% 35%, rgba(120, 180, 255, 0.85), #1a3a7a 45%, #020617 100%);
-  animation: elim-scan-hit-pulse 0.3s ease-in-out;
+  animation: elim-scan-hit-pulse 0.3s ease-in-out infinite;
+  filter: brightness(1.2);
+}
+
+@keyframes elim-scan-cycle {
+  0%,
+  100% {
+    background: radial-gradient(ellipse at 50% 0%, rgba(61, 255, 154, 0.32), #071a12 55%, #020617 100%);
+  }
+  33% {
+    background: #020617;
+  }
+  66% {
+    background: radial-gradient(ellipse at 50% 35%, rgba(90, 150, 255, 0.65), #0a1a3a 50%, #020617 100%);
+  }
 }
 
 @keyframes elim-scan-hit-pulse {
-  0% {
-    background: radial-gradient(ellipse at 50% 35%, #a8d0ff 0%, #2a5aaa 40%, #020617 100%);
-  }
+  0%,
   100% {
-    background: radial-gradient(ellipse at 50% 35%, rgba(120, 180, 255, 0.85), #1a3a7a 45%, #020617 100%);
+    background: radial-gradient(ellipse at 50% 35%, rgba(140, 190, 255, 0.95), #1a3a7a 40%, #020617 100%);
+  }
+  50% {
+    background: radial-gradient(ellipse at 50% 35%, #c8e0ff 0%, #3a6fd0 45%, #020617 100%);
   }
 }
 
