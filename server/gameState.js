@@ -1249,7 +1249,7 @@ function continueAfterBoards(state) {
     if (state.questionIndex === ONE_PERCENT_INDEX) {
       next = awardOnePercentWinners(next);
     }
-    return actionMeta(cue(next, 'win'), 'finale');
+    return actionMeta(cue(next, 'intro', { loop: true, volume: 0.55 }), 'finale');
   }
   if (pending === 'solo_offer') {
     return actionMeta(
@@ -1396,7 +1396,10 @@ export function resolveFinalChoice(state) {
 
   if (stayers.length === 0) {
     return actionMeta(
-      cue({ ...state, players, jackpot, phase: 'finale' }, 'win'),
+      cue({ ...state, players, jackpot, phase: 'finale' }, 'intro', {
+        loop: true,
+        volume: 0.55,
+      }),
       'finale',
     );
   }
@@ -1436,7 +1439,8 @@ export function soloDecide(state, take10k) {
           finalOffer: offer,
           phase: 'finale',
         },
-        'win',
+        'intro',
+        { loop: true, volume: 0.55 },
       ),
       'solo_offer_taken',
     );

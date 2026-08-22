@@ -10,7 +10,8 @@ const DEFAULT_SOUNDS = {
   youre_out: 'youre-out.mp3',
   pass: 'pass.mp3',
   jackpot: 'jackpot.mp3',
-  win: 'win.mp3',
+  // Finale uses intro bed (win.mp3 unused)
+  win: 'intro.mp3',
 };
 
 let soundFiles = { ...DEFAULT_SOUNDS };
