@@ -222,26 +222,23 @@ function answerSecondsTotal() {
   return state?.setup?.answerSeconds || 30;
 }
 
-/** LED-ring badge: center = question %, ring = time remaining. Hidden when time hits 0. */
+/** LED-ring badge: only while host-started countdown is running. Hidden before start and at 0. */
 function renderPctTimerBadge({ percent, secs, totalSecs, answering }) {
-  if (answering && secs != null && secs <= 0) return '';
+  if (!answering) return '';
+  if (secs != null && secs <= 0) return '';
   const total = Math.max(1, Number(totalSecs) || 30);
-  const left = answering && secs != null ? Math.max(0, secs) : total;
-  const progress = answering ? left / total : 1;
-  const warn = answering && secs != null && secs <= 5;
+  const left = secs != null ? Math.max(0, secs) : total;
+  const progress = left / total;
+  const warn = secs != null && secs <= 5;
   return `
-    <div class="pct-timer ${warn ? 'pct-timer--warn' : ''} ${answering ? 'pct-timer--live' : 'pct-timer--hold'}"
+    <div class="pct-timer pct-timer--live ${warn ? 'pct-timer--warn' : ''}"
          style="--progress:${progress.toFixed(4)}"
          id="pctTimerBadge"
          data-total="${total}">
       <div class="pct-timer__leds" aria-hidden="true"></div>
       <div class="pct-timer__face">
         <div class="pct-timer__percent">${escapeHtml(String(percent ?? '?'))}%</div>
-        ${
-          answering
-            ? `<div class="pct-timer__secs" id="tvTimer">${secs ?? '—'}</div>`
-            : `<div class="pct-timer__hint">READY</div>`
-        }
+        <div class="pct-timer__secs" id="tvTimer">${secs ?? '—'}</div>
       </div>
     </div>
   `;
@@ -307,8 +304,12 @@ function renderQuestion() {
           }
           ${hasChoices ? `<div class="q-area-choices">${renderChoices(q.choices)}</div>` : '<div class="q-area-choices"></div>'}
           <div class="q-area-meta">
-            <div class="timer ${secs !== null && secs <= 5 ? 'warn' : ''}" id="tvTimer">${secs ?? '—'}</div>
-            <div class="lock-progress">${locked} / ${active.length} locked in</div>
+            ${
+              answering
+                ? `<div class="timer ${secs !== null && secs <= 5 ? 'warn' : ''}" id="tvTimer">${secs ?? '—'}</div>
+            <div class="lock-progress">${locked} / ${active.length} locked in</div>`
+                : ''
+            }
           </div>
         </div>
       </div>

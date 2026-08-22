@@ -129,6 +129,38 @@ input[type='text'] {
   font-size: 1.05rem;
 }
 
+.choice-pad {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(4.5rem, 1fr));
+  gap: 0.65rem;
+}
+
+.choice-btn {
+  appearance: none;
+  border: 2px solid rgba(255, 213, 74, 0.55);
+  background: rgba(0, 0, 0, 0.4);
+  color: var(--club-gold, #ffd54a);
+  font-family: var(--font-display, inherit);
+  font-size: 1.85rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  border-radius: 14px;
+  padding: 1.1rem 0.5rem;
+  min-height: 4.25rem;
+}
+
+.choice-btn.is-selected,
+.choice-btn:active {
+  background: rgba(255, 213, 74, 0.22);
+  border-color: var(--club-gold, #ffd54a);
+}
+
+.choice-pad__hint {
+  text-align: center;
+  margin: 0;
+  font-size: 0.85rem;
+}
+
 .pct {
   font-family: var(--font-display);
   font-size: 2.4rem;

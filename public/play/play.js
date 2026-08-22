@@ -1,7 +1,6 @@
 import { connect, sendAction, setPlayerId } from '../shared/ws.js';
 import { installErrorHandlers, mountQaWidget, showBoot, hideBoot } from '../shared/boot.js';
 import {
-  playSound,
   playSoundTimes,
   playTestTone,
   noteSoundCue,
@@ -246,7 +245,8 @@ let answeringViewKey = '';
 
 function answeringKey() {
   const p = me();
-  return `${state?.phase}:${state?.questionIndex}:${state?.myAnswer?.locked || state?.answers?.[playerId]?.locked || false}:${!!p?.hasPass}:${!!p?.usedPass}:${joinError}`;
+  const choiceCount = state?.currentQuestion?.choices?.length || 0;
+  return `${state?.phase}:${state?.questionIndex}:${state?.myAnswer?.locked || state?.answers?.[playerId]?.locked || false}:${!!p?.hasPass}:${!!p?.usedPass}:${joinError}:${choiceCount}`;
 }
 
 function updateTimerOnly() {
@@ -307,7 +307,8 @@ function renderAnswering() {
   // Keep the input mounted — only refresh the countdown while typing
   const key = answeringKey();
   const existing = document.getElementById('answerInput');
-  if (existing && answeringViewKey === key) {
+  const existingChoices = document.getElementById('choicePad');
+  if ((existing || existingChoices) && answeringViewKey === key) {
     updateTimerOnly();
     const err = document.getElementById('answerError');
     if (err) {
@@ -321,17 +322,34 @@ function renderAnswering() {
   if (existing) answerDraft = existing.value;
   answeringViewKey = key;
 
+  const choices = Array.isArray(q?.choices) ? q.choices : [];
+  const isChoiceQuestion = choices.length > 0;
+  const choiceLetters = choices.map((_, i) => String.fromCharCode(65 + i));
+
+  const answerControls = isChoiceQuestion
+    ? `<div class="choice-pad" id="choicePad" role="group" aria-label="Answer choices">
+        ${choiceLetters
+          .map((letter) => {
+            const selected = answerDraft.toUpperCase() === letter ? ' is-selected' : '';
+            return `<button type="button" class="choice-btn${selected}" data-choice="${letter}">${letter}</button>`;
+          })
+          .join('')}
+      </div>
+      <p class="muted choice-pad__hint">Tap A${choiceLetters.length > 2 ? '–' + choiceLetters[choiceLetters.length - 1] : ' or B'} to lock in</p>
+      <p class="error" id="answerError" style="display:${joinError ? 'block' : 'none'}">${escapeHtml(joinError || '')}</p>`
+    : `<label class="field">Your answer
+          <input id="answerInput" type="text" inputmode="text" maxlength="80" placeholder="Type your answer" autocomplete="off" enterkeyhint="done" />
+        </label>
+        <p class="error" id="answerError" style="display:${joinError ? 'block' : 'none'}">${escapeHtml(joinError || '')}</p>
+        <button class="btn-primary big-btn" id="lockBtn">Lock in</button>`;
+
   main.innerHTML = `
     <div class="pct">${q?.percent}%</div>
     <p class="prompt">${escapeHtml(q?.prompt || '')}</p>
     <div class="timer ${secs !== null && secs <= 5 ? 'warn' : ''}" id="answerTimer">${secs ?? '—'}</div>
     <div class="card">
       <div class="stack">
-        <label class="field">Your answer
-          <input id="answerInput" type="text" inputmode="text" maxlength="80" placeholder="Type your answer" autocomplete="off" enterkeyhint="done" />
-        </label>
-        <p class="error" id="answerError" style="display:${joinError ? 'block' : 'none'}">${escapeHtml(joinError || '')}</p>
-        <button class="btn-primary big-btn" id="lockBtn">Lock in</button>
+        ${answerControls}
         ${
           showPassBtn
             ? `<button class="btn-ghost big-btn ${canUsePass ? '' : 'pass-btn--locked'}" id="passBtn" type="button">
@@ -604,6 +622,13 @@ main.addEventListener('click', async (e) => {
       await act('submit_answer', { text });
       return;
     }
+    if (t.dataset?.choice) {
+      const text = String(t.dataset.choice).toUpperCase();
+      answerDraft = text;
+      answeringViewKey = '';
+      await act('submit_answer', { text });
+      return;
+    }
     if (t.id === 'passBtn') {
       const p = me();
       if (state.questionIndex === 14) {
@@ -702,9 +727,8 @@ function syncEliminationUi(p) {
 }
 
 async function playOutSting() {
+  // /play stays silent on personal out — room sting is TV-only
   playedOutSound = true;
-  // Must already be unlocked from volume gate / QA — play() outside gesture fails on iOS otherwise
-  await playSound('youre_out', { volume: 1 });
 }
 
 function handlePlayerSoundCue(cue) {
@@ -712,24 +736,19 @@ function handlePlayerSoundCue(cue) {
   lastPlaySoundAt = cue.at;
   noteSoundCue(cue);
 
-  // TV-only eliminating during show-wrongs — phones just flash via elim-scanning
-  if (cue.name === 'eliminating' || cue.audience === 'display') {
+  // Phones: only blue-light search (eliminating) + thump. Everything else is TV-only.
+  if (cue.name === 'eliminating') {
     stopPendingEliminating();
+    const times = cue.times || state?.elimination?.stingTimes || 1;
+    const vol = typeof cue.volume === 'number' ? cue.volume : 1;
+    playSoundTimes('eliminating', times, { volume: vol }).catch(() => {});
     return;
   }
 
-  // thump on phones; TV also plays
   if (cue.name === 'thump') {
     stopPendingEliminating();
     const times = cue.times || 1;
     playSoundTimes('thump', times, { volume: 1 }).catch(() => {});
-    return;
-  }
-
-  // After all wrongs shown — room eliminate sting (not per-player)
-  if (cue.name === 'eliminate') {
-    stopPendingEliminating();
-    playSound('eliminate', { volume: 1 }).catch(() => {});
   }
 }
 

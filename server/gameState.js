@@ -39,10 +39,74 @@ export function normalizeAnswer(text) {
     .trim();
 }
 
+/** Strip "option c", "c)", "c." → "c" for letter answers. */
+function canonicalizeAnswer(text) {
+  let n = normalizeAnswer(text);
+  if (!n) return '';
+  n = n.replace(/^option\s+/, '');
+  n = n.replace(/^([a-d])(?:\s*[).:\-]|\s+)/, '$1');
+  n = n.replace(/\s+/g, ' ').trim();
+  return n;
+}
+
+/** Expand accepted aliases (letters, option labels, matching choice text only). */
+export function expandAcceptedAnswers(accepted, choices = []) {
+  const out = new Set();
+  const add = (v) => {
+    const s = String(v ?? '').trim();
+    if (s) out.add(s);
+  };
+  const list = [...(accepted ?? [])];
+  for (const a of list) add(a);
+
+  const acceptedNorm = list.map(canonicalizeAnswer).filter(Boolean);
+
+  (choices ?? []).forEach((text, idx) => {
+    const L = String.fromCharCode(65 + idx);
+    const textN = canonicalizeAnswer(text);
+    const letterOk = acceptedNorm.includes(L.toLowerCase());
+    const textOk =
+      !!textN &&
+      acceptedNorm.some(
+        (n) =>
+          n === textN ||
+          (n.length >= 3 && textN.length >= 3 && (n.includes(textN) || textN.includes(n))),
+      );
+    if (letterOk || textOk) {
+      add(L);
+      add(L.toLowerCase());
+      add(`option ${L}`);
+      add(`option ${L.toLowerCase()}`);
+      add(text);
+    }
+  });
+
+  for (const a of [...out]) {
+    const n = canonicalizeAnswer(a);
+    if (/^[a-d]$/.test(n)) {
+      const L = n.toUpperCase();
+      add(L);
+      add(L.toLowerCase());
+      add(`option ${L}`);
+      add(`option ${L.toLowerCase()}`);
+      add(`${L})`);
+    }
+  }
+  return [...out];
+}
+
 export function answersMatch(given, acceptedList) {
-  const n = normalizeAnswer(given);
+  const n = canonicalizeAnswer(given);
   if (!n) return false;
-  return (acceptedList ?? []).some((a) => normalizeAnswer(a) === n);
+  const accepted = (acceptedList ?? []).map(canonicalizeAnswer).filter(Boolean);
+  if (accepted.some((a) => a === n)) return true;
+  // Longer free-text only — never let a single letter fuzzy-match inside a word
+  if (n.length >= 4) {
+    return accepted.some(
+      (a) => a.length >= 4 && (a.includes(n) || n.includes(a)),
+    );
+  }
+  return false;
 }
 
 function normalizeImageTransform(t) {
@@ -385,20 +449,12 @@ export function startGame(state, questions, packName = null, packSettings = null
     const choices = Array.isArray(q.choices)
       ? q.choices.map((c) => String(c)).filter(Boolean).slice(0, 6)
       : [];
-    let accepted = Array.isArray(q.accepted)
+    const rawAccepted = Array.isArray(q.accepted)
       ? q.accepted
       : Array.isArray(q.answers)
         ? q.answers
         : [q.answer].filter(Boolean);
-    // Allow answering by letter (A/B/C) or by choice text
-    if (choices.length) {
-      const extras = [];
-      choices.forEach((text, idx) => {
-        extras.push(String.fromCharCode(65 + idx)); // A, B, C…
-        extras.push(text);
-      });
-      accepted = [...accepted, ...extras];
-    }
+    const accepted = expandAcceptedAnswers(rawAccepted, choices);
     return {
       index: i,
       percent: pct,
@@ -811,7 +867,7 @@ export function showResults(state) {
         },
       },
       'eliminating',
-      { times, audience: 'display', loop: false },
+      { times, audience: 'all', loop: false },
     ),
     'show_results_scanning',
     { times },
@@ -881,13 +937,13 @@ export function enterPrizePot(state) {
   return actionMeta(cue({ ...state, phase: 'prize_pot' }, 'eliminate', { audience: 'all' }), 'prize_pot');
 }
 
-/** TV board: host announced the correct answer (during/after roast). */
+/** TV board: host announced the correct answer (during/after roast). Silent — no sting. */
 export function enterRightAnswerBoard(state) {
   if (state.phase !== 'left_count' && state.phase !== 'answer_reveal') {
     throw new Error('Show right answer after who remains');
   }
   return actionMeta(
-    cue({ ...state, phase: 'answer_reveal' }, 'correct', { audience: 'all' }),
+    { ...state, phase: 'answer_reveal', soundCue: null },
     'show_right_answer',
   );
 }
