@@ -35,6 +35,7 @@ import {
   resolveCashout,
   finalDecide,
   resolveFinalChoice,
+  startOnePercent,
   soloDecide,
   clearSoundCue,
   resetToLobby,
@@ -414,8 +415,13 @@ async function handleAction(action, payload = {}, meta = {}) {
       state = resolveFinalChoice(state);
       break;
 
+    case 'start_one_percent':
+      requireHost(role);
+      state = startOnePercent(state);
+      break;
+
     case 'solo_decide':
-      // Host or the solo player can decide
+      // Host or the solo player can decide (1% waits for host to start the question)
       state = soloDecide(state, !!payload.take10k);
       break;
 

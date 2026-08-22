@@ -1349,6 +1349,7 @@ export function resolveCashout(state) {
 
 export function finalDecide(state, playerId, take10k) {
   if (state.phase !== 'final_choice') throw new Error('Not in final choice');
+  if (state._awaitingOnePercent) throw new Error('Decisions already locked');
   const player = state.players.find((p) => p.id === playerId);
   if (!player || player.status !== 'active') throw new Error('Not active');
 
@@ -1363,6 +1364,9 @@ export function finalDecide(state, playerId, take10k) {
 
 export function resolveFinalChoice(state) {
   if (state.phase !== 'final_choice') throw new Error('Not in final choice');
+  if (state._awaitingOnePercent) {
+    throw new Error('Already locked — start the 1% question');
+  }
   const actives = activePlayers(state);
   // Default: go for 1% if no decision
   const leavers = actives.filter((p) => state.finalDecisions[p.id] === true);
@@ -1384,13 +1388,22 @@ export function resolveFinalChoice(state) {
     return actionMeta(cue({ ...state, players, phase: 'finale' }, 'win'), 'finale');
   }
 
-  return beginQuestion({ ...state, players, finalDecisions: {} }, ONE_PERCENT_INDEX);
+  // Lock leavers out — host advances to the 1% question separately
+  return actionMeta(
+    {
+      ...state,
+      players,
+      _awaitingOnePercent: true,
+    },
+    'resolve_final',
+  );
 }
 
 export function soloDecide(state, take10k) {
   if (state.phase !== 'solo_offer') throw new Error('Not in solo offer');
   const solo = activePlayers(state)[0];
   if (!solo) throw new Error('No solo player');
+  if (state.soloDecision) throw new Error('Already decided');
 
   if (take10k) {
     const players = state.players.map((p) =>
@@ -1402,9 +1415,38 @@ export function soloDecide(state, take10k) {
     );
   }
 
-  // Jump to 1%
+  // Record intent only — host starts the 1% question
+  return actionMeta(
+    { ...state, soloDecision: 'one_percent', _awaitingOnePercent: true },
+    'solo_go_1pct',
+  );
+}
+
+/** Host advances from final/solo offer into the 1% question hold. */
+export function startOnePercent(state) {
+  if (state.phase === 'final_choice' && !state._awaitingOnePercent) {
+    const locked = resolveFinalChoice(state);
+    if (locked.phase === 'finale') return locked;
+    return startOnePercent(locked);
+  }
+  if (state.phase === 'solo_offer' && state.soloDecision !== 'one_percent') {
+    throw new Error('Solo player has not chosen 1% yet');
+  }
+  if (
+    state.phase !== 'final_choice' &&
+    state.phase !== 'solo_offer'
+  ) {
+    throw new Error('Not ready for 1% question');
+  }
+  if (!state._awaitingOnePercent && state.soloDecision !== 'one_percent') {
+    throw new Error('Lock final decisions first');
+  }
   return beginQuestion(
-    { ...state, soloDecision: 'one_percent' },
+    {
+      ...state,
+      _awaitingOnePercent: undefined,
+      finalDecisions: {},
+    },
     ONE_PERCENT_INDEX,
   );
 }
