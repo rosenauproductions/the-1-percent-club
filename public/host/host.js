@@ -98,6 +98,61 @@ function activePlayers() {
   return (state.players || []).filter((p) => p.status === 'active');
 }
 
+/** Keeps question image mounted — only refresh countdown / locks / live list. */
+let questionViewKey = '';
+
+function answeringSeconds() {
+  if (!state?.timerEndsAt) return null;
+  return Math.max(0, Math.ceil((state.timerEndsAt - Date.now()) / 1000));
+}
+
+function questionViewKeyFor(s) {
+  const q = s?.currentQuestion;
+  return `${s?.phase}:${s?.questionIndex}:${q?.image || ''}:${q?.percent ?? ''}`;
+}
+
+function liveAnswerRowsHtml() {
+  const active = activePlayers();
+  return active
+    .map((p) => {
+      const a = state.answers[p.id];
+      const forced =
+        a?.forceCorrect === true
+          ? ' · forced ✓'
+          : a?.forceWrong === true
+            ? ' · forced ✗'
+            : '';
+      return `<li>
+        <div class="name">${escapeHtml(p.name)}${escapeHtml(forced)}</div>
+        <div class="text">${
+          a?.locked ? (a.usedPass ? '(PASS)' : escapeHtml(a.text || '—')) : '…thinking'
+        }</div>
+        ${
+          a?.locked && !a.usedPass
+            ? `<div style="display:flex;gap:0.4rem;margin-top:0.35rem;flex-wrap:wrap">
+                <button type="button" class="btn-ghost" style="padding:0.3rem 0.55rem;font-size:0.75rem" data-override="${escapeHtml(p.id)}" data-correct="1">Count correct</button>
+                <button type="button" class="btn-ghost" style="padding:0.3rem 0.55rem;font-size:0.75rem;opacity:0.7" data-override="${escapeHtml(p.id)}" data-correct="0">Force wrong</button>
+              </div>`
+            : ''
+        }
+      </li>`;
+    })
+    .join('');
+}
+
+function updateAnsweringOnly() {
+  if (!state || state.phase !== 'answering') return false;
+  const meta = document.getElementById('hostAnsweringMeta');
+  const list = document.getElementById('hostLiveAnswers');
+  if (!meta || !list) return false;
+
+  const secs = answeringSeconds();
+  const active = activePlayers();
+  meta.textContent = `${lockedCount()} / ${active.length} locked · ${secs ?? '—'}s`;
+  list.innerHTML = liveAnswerRowsHtml();
+  return true;
+}
+
 function renderLobby() {
   const players = state.players || [];
   main.innerHTML = `
@@ -228,8 +283,15 @@ function renderQuestion() {
   const q = state.currentQuestion;
   const active = activePlayers();
   const answering = state.phase === 'answering';
-  const secs = state.timerEndsAt ? Math.max(0, Math.ceil((state.timerEndsAt - Date.now()) / 1000)) : null;
+  const secs = answeringSeconds();
   const isOnePercent = q?.percent === 1 || state.questionIndex === 14;
+  const key = questionViewKeyFor(state);
+
+  // Answering: keep the question image mounted; only patch live bits
+  if (answering && questionViewKey === key && updateAnsweringOnly()) {
+    return;
+  }
+  questionViewKey = key;
 
   main.innerHTML = `
     <div class="card">
@@ -256,7 +318,11 @@ function renderQuestion() {
       <p class="muted" style="margin-top:0.65rem">Type: <strong>${escapeHtml(q?.answerType || 'text')}</strong>${
         q?.fuzzy ? ' · fuzzy spelling' : ''
       } · Accepted: ${(q?.accepted || []).map(escapeHtml).join(' · ')}</p>
-      ${answering ? `<p class="muted">${lockedCount()} / ${active.length} locked · ${secs ?? '—'}s</p>` : ''}
+      ${
+        answering
+          ? `<p class="muted" id="hostAnsweringMeta">${lockedCount()} / ${active.length} locked · ${secs ?? '—'}s</p>`
+          : ''
+      }
       <div class="stack" style="margin-top:0.85rem">
         ${
           !answering
@@ -270,32 +336,8 @@ function renderQuestion() {
       answering
         ? `<div class="card"><h2>Live answers · umpire</h2>
             <p class="muted" style="margin:0 0 0.65rem">You see every lock. Mark correct if the server is being picky.</p>
-            <ul class="answer-list">
-              ${active
-                .map((p) => {
-                  const a = state.answers[p.id];
-                  const forced =
-                    a?.forceCorrect === true
-                      ? ' · forced ✓'
-                      : a?.forceWrong === true
-                        ? ' · forced ✗'
-                        : '';
-                  return `<li>
-                    <div class="name">${escapeHtml(p.name)}${escapeHtml(forced)}</div>
-                    <div class="text">${
-                      a?.locked ? (a.usedPass ? '(PASS)' : escapeHtml(a.text || '—')) : '…thinking'
-                    }</div>
-                    ${
-                      a?.locked && !a.usedPass
-                        ? `<div style="display:flex;gap:0.4rem;margin-top:0.35rem;flex-wrap:wrap">
-                            <button type="button" class="btn-ghost" style="padding:0.3rem 0.55rem;font-size:0.75rem" data-override="${escapeHtml(p.id)}" data-correct="1">Count correct</button>
-                            <button type="button" class="btn-ghost" style="padding:0.3rem 0.55rem;font-size:0.75rem;opacity:0.7" data-override="${escapeHtml(p.id)}" data-correct="0">Force wrong</button>
-                          </div>`
-                        : ''
-                    }
-                  </li>`;
-                })
-                .join('')}
+            <ul class="answer-list" id="hostLiveAnswers">
+              ${liveAnswerRowsHtml()}
             </ul></div>`
         : `<div class="card"><h2>Still in</h2>
             <ul class="answer-list">
@@ -774,10 +816,17 @@ let tick = null;
 function onState(next) {
   state = next;
   hideBoot();
+  if (next.phase !== 'answering' && next.phase !== 'question') {
+    questionViewKey = '';
+  }
   render();
   if (tick) clearInterval(tick);
   if (next.phase === 'answering') {
-    tick = setInterval(render, 250);
+    tick = setInterval(() => {
+      jackpotEl.textContent = money(state.jackpot);
+      statusLine.textContent = `Phase: ${state.phase} · Players ${state.players?.length || 0} · TV ${state.displayConnected ? '✓' : '✗'}`;
+      if (!updateAnsweringOnly()) render();
+    }, 250);
   }
 }
 

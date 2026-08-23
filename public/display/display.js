@@ -152,7 +152,6 @@ function startTimerTick() {
   timerInterval = setInterval(() => {
     if (state?.phase !== 'answering') return;
     const secs = secondsLeft();
-    const total = answerSecondsTotal();
     // Play the timer ending sting only when the countdown is truly winding down
     if (
       secs !== null &&
@@ -163,33 +162,54 @@ function startTimerTick() {
       timerEndSeeked = true;
       seekTimerToEnd(Math.max(0.5, secs));
     }
-    const badge = document.getElementById('pctTimerBadge');
-    if (badge) {
-      if (secs != null && secs <= 0) {
-        badge.remove();
-        return;
-      }
+    if (!updateDisplayAnsweringLive() && !(secs != null && secs <= 0)) render();
+  }, 200);
+}
+
+/** Patch timer / lock counts without remounting the board image. */
+function updateDisplayAnsweringLive() {
+  if (!state || state.phase !== 'answering') return false;
+  const secs = secondsLeft();
+  const total = answerSecondsTotal();
+  const badge = document.getElementById('pctTimerBadge');
+  const el = document.getElementById('tvTimer');
+  const lock =
+    document.querySelector('.image-board__locks') ||
+    document.querySelector('.lock-progress');
+  const boardImg =
+    document.querySelector('.image-board__img') ||
+    document.querySelector('.question-image');
+
+  if (!badge && !el && !lock && !boardImg) return false;
+
+  if (badge) {
+    if (secs != null && secs <= 0) {
+      badge.remove();
+    } else {
       const progress = secs == null ? 1 : Math.max(0, secs) / total;
       badge.style.setProperty('--progress', progress.toFixed(4));
       badge.classList.toggle('pct-timer--warn', secs !== null && secs <= 5);
       const secsEl = document.getElementById('tvTimer');
       if (secsEl) secsEl.textContent = String(secs ?? '—');
     }
-    const el = document.getElementById('tvTimer');
-    if (el && !badge) {
-      el.textContent = String(secs ?? '—');
-      el.classList.toggle('warn', secs !== null && secs <= 5);
-    }
-    const lock =
-      document.querySelector('.image-board__locks') ||
-      document.querySelector('.lock-progress');
-    if (lock && state && !lock.classList.contains('elim-status')) {
-      const active = state.players.filter((p) => p.status === 'active').length;
-      const locked = Object.values(state.answers || {}).filter((a) => a.locked).length;
-      lock.textContent = `${locked} / ${active} locked in`;
-    }
-    if (!el && !badge && !(secs != null && secs <= 0)) render();
-  }, 200);
+  }
+  if (el && !badge) {
+    el.textContent = String(secs ?? '—');
+    el.classList.toggle('warn', secs !== null && secs <= 5);
+  }
+  if (lock && !lock.classList.contains('elim-status')) {
+    const active = state.players.filter((p) => p.status === 'active').length;
+    const locked = Object.values(state.answers || {}).filter((a) => a.locked).length;
+    lock.textContent = `${locked} / ${active} locked in`;
+  }
+  return true;
+}
+
+let displayQuestionKey = '';
+
+function displayQuestionKeyFor(s) {
+  const q = s?.currentQuestion;
+  return `${s?.phase}:${s?.questionIndex}:${q?.image || ''}:${q?.percent ?? ''}`;
 }
 
 async function renderLobby() {
@@ -297,6 +317,14 @@ function renderQuestion() {
   const active = state.players.filter((p) => p.status === 'active');
   const locked = Object.values(state.answers || {}).filter((a) => a.locked).length;
   const answering = state.phase === 'answering';
+  const key = displayQuestionKeyFor(state);
+
+  // Keep the board image mounted while only locks / timer change
+  if (answering && displayQuestionKey === key && updateDisplayAnsweringLive()) {
+    return;
+  }
+  displayQuestionKey = key;
+
   // Brand hold only when we truly have no board image yet
   const hostHold = !answering && !!q?.promptHidden && !q?.image;
   const imageOnly = isImageBoardQuestion(q);
@@ -924,6 +952,8 @@ function onState(next) {
   if (next.phase === 'answering') {
     if (prevPhase !== 'answering') timerEndSeeked = false;
     startTimerTick();
+  } else {
+    displayQuestionKey = '';
   }
   handleSoundCue(next.soundCue);
 }
