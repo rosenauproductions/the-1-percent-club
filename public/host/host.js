@@ -55,9 +55,24 @@ function advanceLabel({ allOut = false } = {}) {
 async function act(action, payload = {}) {
   try {
     await sendAction(action, payload);
+    return true;
   } catch (err) {
     alert(err.message);
+    return false;
   }
+}
+
+/** Brief “Saved” flash on Save setup (survives re-render until expiry). */
+let setupSavedUntil = 0;
+let setupSavedTimer = null;
+
+function flashSetupSaved() {
+  setupSavedUntil = Date.now() + 2000;
+  if (setupSavedTimer) clearTimeout(setupSavedTimer);
+  setupSavedTimer = setTimeout(() => {
+    setupSavedTimer = null;
+    if (state?.phase === 'lobby') render();
+  }, 2000);
 }
 
 async function loadPacks() {
@@ -119,8 +134,8 @@ function renderLobby() {
           <input id="volInput" type="number" min="0" max="1" step="0.05" value="${state.setup.masterVolume ?? 0.7}" />
         </label>
         <label class="field">Intro music volume (0–1)
-          <input id="introVolInput" type="range" min="0" max="1" step="0.05" value="${state.setup.introVolume ?? 0.2}" />
-          <span class="muted" id="introVolLabel">${Math.round((state.setup.introVolume ?? 0.2) * 100)}%</span>
+          <input id="introVolInput" type="range" min="0" max="1" step="0.05" value="${state.setup.introVolume ?? 0.75}" />
+          <span class="muted" id="introVolLabel">${Math.round((state.setup.introVolume ?? 0.75) * 100)}%</span>
         </label>
         <label class="field" style="flex-direction:row;align-items:center;gap:0.5rem">
           <input id="fastFinish" type="checkbox" ${state.setup.fastFinishWhenAllLocked ? 'checked' : ''} />
@@ -130,7 +145,11 @@ function renderLobby() {
           <input id="skipIntro" type="checkbox" ${state.setup.skipIntro ? 'checked' : ''} />
           Skip intro
         </label>
-        <button class="btn-ghost" id="saveSetup">Save setup</button>
+        ${
+          Date.now() < setupSavedUntil
+            ? `<button class="btn-ghost setup-saved" id="saveSetup" disabled>Saved</button>`
+            : `<button class="btn-ghost" id="saveSetup">Save setup</button>`
+        }
         ${
           testMode
             ? `<button class="btn-ghost" data-act="seed_test_players" style="opacity:0.55;font-size:0.85rem">
@@ -145,7 +164,7 @@ function renderLobby() {
 }
 
 function renderIntro() {
-  const introPct = Math.round((state.setup?.introVolume ?? 0.2) * 100);
+  const introPct = Math.round((state.setup?.introVolume ?? 0.75) * 100);
   main.innerHTML = `
     <div class="card">
       <h2>Intro</h2>
@@ -673,16 +692,21 @@ main.addEventListener('click', async (e) => {
   if (!(t instanceof HTMLElement)) return;
 
   if (t.id === 'saveSetup') {
-    await act('update_setup', {
+    if (Date.now() < setupSavedUntil) return;
+    const ok = await act('update_setup', {
       setup: {
         questionFile: document.getElementById('packSelect')?.value,
         answerSeconds: Number(document.getElementById('secsInput')?.value || 30),
         masterVolume: Number(document.getElementById('volInput')?.value || 0.7),
-        introVolume: Number(document.getElementById('introVolInput')?.value || 0.2),
+        introVolume: Number(document.getElementById('introVolInput')?.value || 0.75),
         fastFinishWhenAllLocked: !!document.getElementById('fastFinish')?.checked,
         skipIntro: !!document.getElementById('skipIntro')?.checked,
       },
     });
+    if (ok) {
+      flashSetupSaved();
+      if (state?.phase === 'lobby') render();
+    }
     return;
   }
 

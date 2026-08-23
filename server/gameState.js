@@ -222,7 +222,7 @@ function defaultSetup() {
     answerSeconds: ANSWER_SECONDS,
     masterVolume: 0.7,
     /** Soft intro bed level (display uses this on intro cues). */
-    introVolume: 0.2,
+    introVolume: 0.75,
     /** When true, cut the answer window to ~3s once everyone has locked. Default off. */
     fastFinishWhenAllLocked: false,
     skipIntro: false,
@@ -230,10 +230,10 @@ function defaultSetup() {
   };
 }
 
-/** Intro bed volume from setup (default 0.2). */
+/** Intro bed volume from setup (default 0.75). */
 export function introVolumeFromSetup(setup) {
   const v = Number(setup?.introVolume);
-  if (!Number.isFinite(v)) return 0.2;
+  if (!Number.isFinite(v)) return 0.75;
   return Math.max(0, Math.min(1, v));
 }
 

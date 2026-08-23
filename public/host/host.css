@@ -201,6 +201,14 @@ label.field input {
   font-size: 0.9rem;
 }
 
+button.setup-saved,
+button.setup-saved:disabled {
+  color: var(--club-ok);
+  border-color: rgba(61, 255, 154, 0.45);
+  opacity: 1;
+  cursor: default;
+}
+
 .pass-example-art {
   display: block;
   width: min(100%, 22rem);

@@ -868,7 +868,7 @@ async function handleSoundCue(cue) {
   }
 
   const setupIntro =
-    typeof state?.setup?.introVolume === 'number' ? state.setup.introVolume : 0.2;
+    typeof state?.setup?.introVolume === 'number' ? state.setup.introVolume : 0.75;
   const volume =
     typeof cue.volume === 'number'
       ? cue.volume
