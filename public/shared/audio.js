@@ -151,12 +151,17 @@ export function stopAllMusic() {
     timerBodyLoopCleanup = null;
   }
   timerAllowEnding = false;
+  // Timer bed plays asMusic:false (tracked separately) — must pause, not only null.
+  if (timerTrack) {
+    timerTrack.pause();
+    timerTrack.currentTime = 0;
+    timerTrack = null;
+  }
   for (const audio of musicTracks) {
     audio.pause();
     audio.currentTime = 0;
   }
   musicTracks.clear();
-  timerTrack = null;
 }
 
 /**
