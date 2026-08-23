@@ -8,6 +8,7 @@ import {
   stopPendingEliminating,
 } from '../shared/audio.js';
 import { scanSpotlightId } from '../shared/elimScan.js';
+import { formatMoney, normalizeCurrency } from '../shared/money.js';
 
 installErrorHandlers('play');
 mountQaWidget('play', { audioTools: true });
@@ -53,8 +54,12 @@ function saveIdentity() {
   );
 }
 
-function money(n) {
-  return `$${Number(n || 0).toLocaleString('en-US')}`;
+function currency() {
+  return normalizeCurrency(state?.setup?.currency);
+}
+
+function money(n, opts) {
+  return formatMoney(n, currency(), opts);
 }
 
 function escapeHtml(s) {
@@ -390,7 +395,7 @@ function renderAnswering() {
             ? `<button class="pass-btn ${canUsePass ? '' : 'pass-btn--locked'}" id="passBtn" type="button" aria-disabled="${canUsePass ? 'false' : 'true'}">
                 <span class="pass-btn__eyebrow">SAFETY NET</span>
                 <span class="pass-btn__title">USE PASS</span>
-                <span class="pass-btn__sub">−$1,000 to jackpot · skip this question</span>
+                <span class="pass-btn__sub">−${money(1000, { short: true })} to jackpot · skip this question</span>
                </button>
                <p class="pass-hint" id="passHint">${
                  canUsePass
@@ -421,7 +426,7 @@ function renderPassBriefing() {
       <h1>You have a PASS</h1>
       <p class="muted">${
         hasPass
-          ? 'One free escape on a later question. Using it puts $1,000 in the jackpot.'
+          ? `One free escape on a later question. Using it puts ${money(1000)} in the jackpot.`
           : 'Listen to the host — passes are being explained.'
       }</p>
       <p class="muted" style="margin-top:0.75rem">Hang tight for the 50% question.</p>
@@ -435,16 +440,16 @@ function renderCashout() {
   main.innerHTML = `
     <div class="hero">
       <h1>Before 30%</h1>
-      <p>Leave now with $1,000?</p>
+      <p>Leave now with ${money(1000)}?</p>
     </div>
     <div class="card">
       ${
         !eligible
           ? `<p class="muted">You already used your pass — you must continue.</p>`
           : decided !== undefined
-            ? `<p class="muted">You chose: <strong>${decided ? 'LEAVE with $1,000' : 'STAY'}</strong></p>`
+            ? `<p class="muted">You chose: <strong>${decided ? `LEAVE with ${money(1000)}` : 'STAY'}</strong></p>`
             : `<div class="stack">
-                <button class="btn-gold big-btn" id="leaveBtn">Leave with $1,000</button>
+                <button class="btn-gold big-btn" id="leaveBtn">Leave with ${money(1000)}</button>
                 <button class="btn-primary big-btn" id="stayBtn">Stay in the game</button>
               </div>`
       }

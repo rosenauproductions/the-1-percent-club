@@ -216,6 +216,11 @@ function normalizeImageTransform(t) {
   };
 }
 
+/** @param {unknown} value */
+export function normalizeCurrency(value) {
+  return value === 'dollars' ? 'dollars' : 'points';
+}
+
 function defaultSetup() {
   return {
     questionFile: 'split-decision.json',
@@ -226,6 +231,8 @@ function defaultSetup() {
     /** When true, cut the answer window to ~3s once everyone has locked. Default off. */
     fastFinishWhenAllLocked: false,
     skipIntro: false,
+    /** Display unit for stakes/jackpot: 'points' (default) or 'dollars'. */
+    currency: 'points',
     sounds: {},
   };
 }
@@ -433,6 +440,11 @@ export function applySetup(state, setup) {
   if (setup && Object.prototype.hasOwnProperty.call(setup, 'masterVolume')) {
     const mv = Number(setup.masterVolume);
     next.masterVolume = Number.isFinite(mv) ? Math.max(0, Math.min(1, mv)) : state.setup.masterVolume;
+  }
+  if (setup && Object.prototype.hasOwnProperty.call(setup, 'currency')) {
+    next.currency = normalizeCurrency(setup.currency);
+  } else {
+    next.currency = normalizeCurrency(next.currency);
   }
   return {
     ...state,

@@ -1,6 +1,8 @@
+import { formatMoney, normalizeCurrency } from '../shared/money.js';
+
 const PERCENTS = [90, 80, 70, 60, 50, 45, 40, 35, 30, 25, 20, 15, 10, 5, 1];
 
-/** @type {{ name: string, settings: { hidePrompt: boolean }, questions: object[] }} */
+/** @type {{ name: string, settings: { hidePrompt: boolean, currency: 'points' | 'dollars' }, questions: object[] }} */
 let pack = blankPack();
 let selectedIndex = 0;
 let previewMode = 'question';
@@ -10,6 +12,7 @@ const previewBlobs = {};
 const els = {
   packName: document.getElementById('packName'),
   hidePrompt: document.getElementById('hidePrompt'),
+  currency: document.getElementById('currency'),
   fillAbNames: document.getElementById('fillAbNames'),
   slotList: document.getElementById('slotList'),
   editorTitle: document.getElementById('editorTitle'),
@@ -32,6 +35,7 @@ const els = {
   yVal: document.getElementById('yVal'),
   resetTransform: document.getElementById('resetTransform'),
   previewMain: document.getElementById('previewMain'),
+  previewJackpot: document.getElementById('previewJackpot'),
   imageReminder: document.getElementById('imageReminder'),
 };
 
@@ -51,9 +55,14 @@ function blankQuestion(percent) {
 function blankPack() {
   return {
     name: 'My Question Pack',
-    settings: { hidePrompt: false },
+    settings: { hidePrompt: false, currency: 'points' },
     questions: PERCENTS.map((p) => blankQuestion(p)),
   };
+}
+
+function syncPreviewJackpot() {
+  if (!els.previewJackpot) return;
+  els.previewJackpot.textContent = formatMoney(15000, pack.settings?.currency);
 }
 
 function escapeHtml(s) {
@@ -154,6 +163,8 @@ function fillEditor() {
   const t = ensureTransform(q);
   els.packName.value = pack.name || '';
   els.hidePrompt.checked = !!pack.settings?.hidePrompt;
+  if (els.currency) els.currency.value = normalizeCurrency(pack.settings?.currency);
+  syncPreviewJackpot();
   els.editorTitle.textContent = `${q.percent}% question`;
   els.prompt.value = q.prompt || '';
   els.accepted.value = Array.isArray(q.accepted) ? q.accepted.join('\n') : '';
@@ -172,7 +183,10 @@ function fillEditor() {
 function readEditorIntoPack() {
   const q = currentQ();
   pack.name = els.packName.value.trim() || 'My Question Pack';
-  pack.settings = { hidePrompt: !!els.hidePrompt.checked };
+  pack.settings = {
+    hidePrompt: !!els.hidePrompt.checked,
+    currency: normalizeCurrency(els.currency?.value),
+  };
   q.prompt = els.prompt.value;
   q.accepted = parseList(els.accepted.value);
   q.explanation = els.explanation.value.trim();
@@ -292,12 +306,14 @@ function normalizeLoaded(raw) {
   let name = 'My Question Pack';
   let list = [];
   let hidePrompt = false;
+  let currency = 'points';
   if (Array.isArray(raw)) {
     list = raw;
   } else if (raw && typeof raw === 'object') {
     name = raw.name || name;
     list = raw.questions || [];
     hidePrompt = !!(raw.settings?.hidePrompt || raw.hidePrompt);
+    currency = normalizeCurrency(raw.settings?.currency);
   }
   const byPercent = new Map();
   for (const q of list) {
@@ -306,7 +322,7 @@ function normalizeLoaded(raw) {
   }
   return {
     name,
-    settings: { hidePrompt },
+    settings: { hidePrompt, currency },
     questions: PERCENTS.map((percent) => {
       const src = byPercent.get(percent) || blankQuestion(percent);
       const q = blankQuestion(percent);
@@ -334,7 +350,10 @@ function exportPack() {
   readEditorIntoPack();
   return {
     name: pack.name,
-    settings: { hidePrompt: !!pack.settings?.hidePrompt },
+    settings: {
+      hidePrompt: !!pack.settings?.hidePrompt,
+      currency: normalizeCurrency(pack.settings?.currency),
+    },
     questions: pack.questions.map((q) => {
       const out = {
         percent: q.percent,
@@ -380,6 +399,11 @@ els.slotList.addEventListener('click', (e) => {
 els.hidePrompt.addEventListener('change', () => {
   readEditorIntoPack();
   renderPreview();
+});
+
+els.currency?.addEventListener('change', () => {
+  readEditorIntoPack();
+  syncPreviewJackpot();
 });
 
 els.fillAbNames.addEventListener('click', () => {

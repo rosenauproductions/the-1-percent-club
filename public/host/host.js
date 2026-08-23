@@ -1,5 +1,6 @@
 import { connect, sendAction } from '../shared/ws.js';
 import { installErrorHandlers, mountQaWidget, showBoot, hideBoot } from '../shared/boot.js';
+import { formatMoney, normalizeCurrency } from '../shared/money.js';
 
 installErrorHandlers('host');
 mountQaWidget('host');
@@ -18,8 +19,12 @@ let testMode = params.get('test') === '1' || params.get('test') === 'true';
 let hostTitleTaps = 0;
 let hostTitleTapTimer = null;
 
-function money(n) {
-  return `$${Number(n || 0).toLocaleString('en-US')}`;
+function currency() {
+  return normalizeCurrency(state?.setup?.currency);
+}
+
+function money(n, opts) {
+  return formatMoney(n, currency(), opts);
 }
 
 function escapeHtml(s) {
@@ -31,7 +36,7 @@ function escapeHtml(s) {
 
 const HOST_SNARK = [
   'Let’s put all the ugliness behind us… and focus on the ugliness ahead.',
-  'Congratulations to everyone who just donated their thousand dollars to the smarter people.',
+  'Congratulations to everyone who just donated their stake to the smarter people.',
   'That was a bloodbath. I feel like I should be offering counseling.',
   'If you just got a blue light, thank you for your generous contribution to the pot.',
   'We’ve gone from hopefuls to… significantly fewer hopefuls.',
@@ -130,6 +135,15 @@ function renderLobby() {
         <label class="field">Answer seconds
           <input id="secsInput" type="number" min="10" max="120" value="${state.setup.answerSeconds || 30}" />
         </label>
+        <label class="field">Currency display
+          <select id="currencySelect">
+            <option value="points" ${currency() === 'points' ? 'selected' : ''}>Points</option>
+            <option value="dollars" ${currency() === 'dollars' ? 'selected' : ''}>Dollars</option>
+          </select>
+        </label>
+        <p class="muted" style="margin:0;font-size:0.85rem">
+          Pack Editor currency is applied when you start that pack. For packs without one, Save setup uses this value (default: points).
+        </p>
         <label class="field">Master volume (0–1)
           <input id="volInput" type="number" min="0" max="1" step="0.05" value="${state.setup.masterVolume ?? 0.7}" />
         </label>
@@ -189,7 +203,7 @@ function renderPassBriefing() {
           “Everyone still in just earned a <span style="color:var(--club-gold,#ffd54a)">PASS</span>.”
         </p>
         <p style="margin:0 0 0.5rem">
-          “One free escape on a later question. Use it and you’re safe — but your $1,000 goes into the prize pot.”
+          “One free escape on a later question. Use it and you’re safe — but your ${money(1000)} goes into the prize pot.”
         </p>
         <p style="margin:0">
           “You can’t use it on the 1% question. Hold it or burn it wisely.”
@@ -385,7 +399,7 @@ function renderCashout() {
           .map((p) => {
             const d = state.cashoutDecisions?.[p.id];
             return `<li><div class="name">${escapeHtml(p.name)}</div>
-              <div class="text">${d === true ? 'LEAVING with $1k' : d === false ? 'STAYING' : '…deciding'}</div></li>`;
+              <div class="text">${d === true ? `LEAVING with ${money(1000, { short: true })}` : d === false ? 'STAYING' : '…deciding'}</div></li>`;
           })
           .join('')}
       </ul>
@@ -687,6 +701,26 @@ main.addEventListener('input', (e) => {
   }
 });
 
+main.addEventListener('change', async (e) => {
+  const t = e.target;
+  if (!(t instanceof HTMLElement)) return;
+  if (t.id !== 'packSelect') return;
+  const file = t.value;
+  if (!file) return;
+  try {
+    const res = await fetch(`/api/question-pack?file=${encodeURIComponent(file)}`);
+    if (!res.ok) return;
+    const data = await res.json();
+    const c = data.settings?.currency;
+    if (c !== 'dollars' && c !== 'points') return;
+    const sel = document.getElementById('currencySelect');
+    if (sel) sel.value = c;
+    await act('update_setup', { setup: { questionFile: file, currency: c } });
+  } catch {
+    // ignore
+  }
+});
+
 main.addEventListener('click', async (e) => {
   const t = e.target;
   if (!(t instanceof HTMLElement)) return;
@@ -701,6 +735,7 @@ main.addEventListener('click', async (e) => {
         introVolume: Number(document.getElementById('introVolInput')?.value || 0.75),
         fastFinishWhenAllLocked: !!document.getElementById('fastFinish')?.checked,
         skipIntro: !!document.getElementById('skipIntro')?.checked,
+        currency: normalizeCurrency(document.getElementById('currencySelect')?.value),
       },
     });
     if (ok) {

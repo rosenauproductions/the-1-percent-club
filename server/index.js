@@ -235,6 +235,13 @@ async function loadQuestionPack(filename) {
   const settings = {
     hidePrompt: !!(data && !Array.isArray(data) && data.settings?.hidePrompt),
   };
+  if (
+    data &&
+    !Array.isArray(data) &&
+    (data.settings?.currency === 'dollars' || data.settings?.currency === 'points')
+  ) {
+    settings.currency = data.settings.currency;
+  }
   return { questions, name, packId, settings };
 }
 
@@ -302,6 +309,10 @@ async function handleAction(action, payload = {}, meta = {}) {
     case 'start_game': {
       requireHost(role);
       const pack = await loadQuestionPack(state.setup.questionFile);
+      // Pack Editor `settings.currency` drives the live unit when present.
+      if (pack.settings?.currency === 'dollars' || pack.settings?.currency === 'points') {
+        state = applySetup(state, { currency: pack.settings.currency });
+      }
       state = startGame(state, pack.questions, pack.name, pack.settings);
       break;
     }
@@ -484,6 +495,17 @@ app.get('/api/question-files', async (_req, res) => {
     res.json({ files: await listQuestionFiles() });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+/** Pack metadata (name + settings) for host setup seeding. */
+app.get('/api/question-pack', async (req, res) => {
+  try {
+    const file = String(req.query.file || '');
+    const pack = await loadQuestionPack(file);
+    res.json({ name: pack.name, settings: pack.settings });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
   }
 });
 
