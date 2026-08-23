@@ -1094,6 +1094,17 @@ body.prize-pot-mode .top-bar {
   max-width: calc(70 * var(--u));
 }
 
+.pass-example-art {
+  display: block;
+  width: min(70%, calc(48 * var(--u)));
+  max-height: 28vh;
+  margin: 0 auto;
+  object-fit: contain;
+  border-radius: calc(1.2 * var(--u));
+  border: 2px solid rgba(255, 213, 74, 0.4);
+  background: #020617;
+}
+
 .winner-list {
   list-style: none;
   padding: 0;

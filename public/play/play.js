@@ -415,8 +415,8 @@ function renderPassBriefing() {
       <div class="status-pill win">PASS UNLOCKED</div>
       <img
         class="pass-granted__art"
-        src="/images/pass-available-placeholder.png"
-        alt="Now you can use the pass — temporary placeholder"
+        src="/images/pass-available-example.png"
+        alt="Example of the USE PASS button on your phone"
       />
       <h1>You have a PASS</h1>
       <p class="muted">${

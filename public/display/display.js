@@ -628,6 +628,11 @@ function renderPassBriefing() {
     <div class="center-phase">
       <h1>YOU NOW HAVE A <span class="pct">PASS</span></h1>
       <p>One free escape. Using it puts $1,000 into the prize pot.</p>
+      <img
+        class="pass-example-art"
+        src="/images/pass-available-example.png"
+        alt="USE PASS button example"
+      />
       <p>Listen to the host — then the 50% question.</p>
       <div class="side-grid" style="width:70%;max-height:40%">${renderSeatGrid(state.players.filter((p) => p.status === 'active'))}</div>
     </div>

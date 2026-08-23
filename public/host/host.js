@@ -176,6 +176,12 @@ function renderPassBriefing() {
           “You can’t use it on the 1% question. Hold it or burn it wisely.”
         </p>
       </div>
+      <img
+        class="pass-example-art"
+        src="/images/pass-available-example.png"
+        alt="USE PASS button example shown on player phones"
+      />
+      <p class="muted" style="margin-top:0.5rem">What players see on their phones when they can use a pass</p>
       <p class="muted">${active.length} players now have a pass · TV is on the pass hold</p>
       <button class="btn-primary big-btn" style="margin-top:0.85rem" data-act="resolve_pass_briefing">
         Continue to 50% question

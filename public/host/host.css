@@ -201,6 +201,16 @@ label.field input {
   font-size: 0.9rem;
 }
 
+.pass-example-art {
+  display: block;
+  width: min(100%, 22rem);
+  margin: 0.85rem auto 0.35rem;
+  border-radius: 16px;
+  border: 2px solid rgba(255, 213, 74, 0.45);
+  object-fit: contain;
+  background: #020617;
+}
+
 .badge {
   display: inline-block;
   padding: 0.15rem 0.45rem;
@@ -210,4 +220,14 @@ label.field input {
   letter-spacing: 0.06em;
   background: rgba(46, 230, 255, 0.15);
   color: var(--club-cyan);
+}
+
+.pass-example-art {
+  display: block;
+  width: min(100%, 22rem);
+  margin: 0.75rem auto 0.35rem;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 213, 74, 0.35);
+  object-fit: contain;
+  background: #020617;
 }
