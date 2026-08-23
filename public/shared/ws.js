@@ -29,6 +29,14 @@ export function setPlayerId(id) {
   playerId = id;
 }
 
+/** Re-open the WS if it dropped (state sync). Actions still go over HTTP. */
+export function ensureConnected() {
+  if (socket?.readyState === WebSocket.OPEN || socket?.readyState === WebSocket.CONNECTING) {
+    return;
+  }
+  openSocket();
+}
+
 async function fetchInitialState() {
   try {
     const qs = playerId ? `?playerId=${encodeURIComponent(playerId)}` : '';
@@ -93,6 +101,7 @@ function openSocket() {
 
 /** Actions use HTTP so the client updates immediately; others sync via WebSocket. */
 export async function sendAction(action, payload = {}) {
+  ensureConnected();
   const res = await fetch('/api/action', {
     method: 'POST',
     headers: {
@@ -105,4 +114,32 @@ export async function sendAction(action, payload = {}) {
   if (!res.ok) throw new Error(data.error || 'Action failed');
   if (data.state) onState(data.state);
   return data;
+}
+
+/**
+ * Retry an action until the HTTP ACK succeeds (or a non-retryable error).
+ * Useful on flaky mobile networks during answering.
+ */
+export async function sendActionWithRetry(action, payload = {}, opts = {}) {
+  const maxAttempts = opts.maxAttempts ?? 3;
+  let lastErr;
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    try {
+      ensureConnected();
+      return await sendAction(action, payload);
+    } catch (err) {
+      lastErr = err;
+      const msg = String(err?.message || '');
+      // Don't retry business-rule failures
+      if (
+        /already used pass|not accepting|cannot pass|no pass|not an active|answer required/i.test(
+          msg,
+        )
+      ) {
+        throw err;
+      }
+      await new Promise((r) => setTimeout(r, 180 * (attempt + 1)));
+    }
+  }
+  throw lastErr;
 }

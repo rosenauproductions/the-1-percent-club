@@ -1,4 +1,4 @@
-import { connect, sendAction, setPlayerId } from '../shared/ws.js';
+import { connect, sendAction, sendActionWithRetry, setPlayerId, ensureConnected } from '../shared/ws.js';
 import { installErrorHandlers, mountQaWidget, showBoot, hideBoot } from '../shared/boot.js';
 import {
   playSoundTimes,
@@ -69,9 +69,11 @@ function me() {
   return state.me || state.players?.find((p) => p.id === playerId) || null;
 }
 
-async function act(action, payload = {}) {
+async function act(action, payload = {}, { retry = false } = {}) {
   try {
-    const data = await sendAction(action, { ...payload, playerId });
+    ensureConnected();
+    const send = retry ? sendActionWithRetry : sendAction;
+    const data = await send(action, { ...payload, playerId });
     if (data?.playerId) {
       playerId = data.playerId;
       setPlayerId(playerId);
@@ -86,6 +88,25 @@ async function act(action, payload = {}) {
     render();
     throw err;
   }
+}
+
+function hapticPulse() {
+  try {
+    if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+      navigator.vibrate(12);
+    }
+  } catch {
+    // unsupported / blocked
+  }
+}
+
+function syncChoiceSelection(selectedLetter) {
+  const letter = String(selectedLetter || '').toUpperCase();
+  document.querySelectorAll('.choice-btn[data-choice]').forEach((btn) => {
+    const isSel = btn.dataset.choice === letter;
+    btn.classList.toggle('is-selected', isSel);
+    btn.setAttribute('aria-pressed', isSel ? 'true' : 'false');
+  });
 }
 
 function renderVolumeGate() {
@@ -243,11 +264,13 @@ function renderOut() {
 
 let answerDraft = '';
 let answeringViewKey = '';
+let submitInFlight = null;
 
 function answeringKey() {
   const p = me();
   const mode = state?.currentQuestion?.answerType || 'abc';
-  return `${state?.phase}:${state?.questionIndex}:${state?.myAnswer?.locked || state?.answers?.[playerId]?.locked || false}:${!!p?.hasPass}:${!!p?.usedPass}:${joinError}:${mode}`;
+  const usedPass = !!(state?.myAnswer?.usedPass || state?.answers?.[playerId]?.usedPass);
+  return `${state?.phase}:${state?.questionIndex}:${usedPass}:${!!p?.hasPass}:${!!p?.usedPass}:${joinError}:${mode}`;
 }
 
 function updateTimerOnly() {
@@ -258,6 +281,13 @@ function updateTimerOnly() {
   el.classList.toggle('warn', secs <= 5);
 }
 
+function currentAnswerText() {
+  const ans = state?.myAnswer || state?.answers?.[playerId];
+  if (answerDraft) return answerDraft;
+  if (ans?.usedPass) return '';
+  return String(ans?.text || '');
+}
+
 function renderAnswering() {
   const q = state.currentQuestion;
   const ans = state.myAnswer || state.answers?.[playerId];
@@ -265,23 +295,22 @@ function renderAnswering() {
     ? Math.max(0, Math.ceil((state.timerEndsAt - Date.now()) / 1000))
     : null;
   const p = me();
-  const usedPass = !!p?.usedPass;
+  const usedPass = !!p?.usedPass || !!ans?.usedPass;
   const hasPass = !!p?.hasPass && !usedPass;
   const isOnePercent = state.questionIndex === 14;
-  const canUsePass = hasPass && !isOnePercent && !ans?.locked;
-  const showPassBtn = !usedPass && !ans?.locked;
+  const canUsePass = hasPass && !isOnePercent;
+  const showPassBtn = !usedPass;
 
-  if (ans?.locked) {
+  // Pass is final — show confirmation once used
+  if (ans?.usedPass || usedPass) {
     answerDraft = '';
     answeringViewKey = '';
     main.innerHTML = `
       <div class="pct">${q?.percent}%</div>
       <p class="prompt">${escapeHtml(q?.prompt || '')}</p>
       <div class="card" style="text-align:center">
-        <h2>Locked in</h2>
-        <p style="font-size:1.25rem;font-weight:800;margin:0">
-          ${ans.usedPass ? 'PASS' : escapeHtml(ans.text || '')}
-        </p>
+        <h2>Pass used</h2>
+        <p style="font-size:1.25rem;font-weight:800;margin:0">PASS</p>
         <p class="muted" style="margin-top:0.75rem">Hang tight for the reveal</p>
       </div>
     `;
@@ -290,13 +319,13 @@ function renderAnswering() {
 
   if (state.phase === 'question') {
     answeringViewKey = '';
-    const isOnePercent = q?.percent === 1 || state.questionIndex === 14;
+    const isOnePercentQ = q?.percent === 1 || state.questionIndex === 14;
     main.innerHTML = `
       <div class="pct">${q?.percent ?? '?'}%</div>
       <div class="hero" style="margin-top:1rem">
-        <h1>${isOnePercent ? 'Finalist' : 'Host time'}</h1>
+        <h1>${isOnePercentQ ? 'Finalist' : 'Host time'}</h1>
         <p class="muted">${
-          isOnePercent
+          isOnePercentQ
             ? "You're still in for the 1% question. Listen to the host — it starts when they hit Start."
             : 'Listen to the host. The question appears when they start the timer.'
         }</p>
@@ -305,11 +334,14 @@ function renderAnswering() {
     return;
   }
 
-  // Keep the pad mounted — only refresh the countdown while choosing
+  // Keep the pad mounted — only refresh the countdown / selection while choosing
   const key = answeringKey();
   const existingChoices = document.getElementById('choicePad');
   if (existingChoices && answeringViewKey === key) {
     updateTimerOnly();
+    const selected = currentAnswerText().toUpperCase();
+    if (selected) answerDraft = selected;
+    syncChoiceSelection(selected);
     const err = document.getElementById('answerError');
     if (err) {
       err.textContent = joinError || '';
@@ -320,28 +352,30 @@ function renderAnswering() {
 
   answeringViewKey = key;
 
+  // Prefer local draft, else server's last submitted answer
+  if (!answerDraft && ans?.text && !ans?.usedPass) {
+    answerDraft = String(ans.text).toUpperCase();
+  }
+
   const answerType = q?.answerType || 'abc';
   const letterModes = { ab: ['A', 'B'], abc: ['A', 'B', 'C'], abcd: ['A', 'B', 'C', 'D'] };
   const choiceLetters = letterModes[answerType] || letterModes.abc;
   const choiceLabels = Array.isArray(q?.choices) ? q.choices : [];
+  const selectedLetter = currentAnswerText().toUpperCase();
 
   const answerControls = `<div class="choice-pad" id="choicePad" role="group" aria-label="Answer choices">
         ${choiceLetters
           .map((letter, i) => {
-            const selected = answerDraft.toUpperCase() === letter ? ' is-selected' : '';
+            const selected = selectedLetter === letter ? ' is-selected' : '';
             const label = choiceLabels[i] ? String(choiceLabels[i]) : '';
-            return `<button type="button" class="choice-btn${selected}${label ? ' choice-btn--labeled' : ''}" data-choice="${letter}">
+            return `<button type="button" class="choice-btn${selected}${label ? ' choice-btn--labeled' : ''}" data-choice="${letter}" aria-pressed="${selectedLetter === letter ? 'true' : 'false'}">
               <span class="choice-btn__letter">${letter}</span>
               ${label ? `<span class="choice-btn__label">${escapeHtml(label)}</span>` : ''}
             </button>`;
           })
           .join('')}
       </div>
-      <p class="muted choice-pad__hint">Tap ${
-        choiceLetters.length === 2
-          ? 'A or B'
-          : `A–${choiceLetters[choiceLetters.length - 1]}`
-      } to lock in</p>
+      <p class="muted choice-pad__hint">Choose your answer — you can change it until the timer runs out.</p>
       <p class="error" id="answerError" style="display:${joinError ? 'block' : 'none'}">${escapeHtml(joinError || '')}</p>`;
 
   main.innerHTML = `
@@ -353,7 +387,7 @@ function renderAnswering() {
         ${answerControls}
         ${
           showPassBtn
-            ? `<button class="pass-btn ${canUsePass ? '' : 'pass-btn--locked'}" id="passBtn" type="button">
+            ? `<button class="pass-btn ${canUsePass ? '' : 'pass-btn--locked'}" id="passBtn" type="button" aria-disabled="${canUsePass ? 'false' : 'true'}">
                 <span class="pass-btn__eyebrow">SAFETY NET</span>
                 <span class="pass-btn__title">USE PASS</span>
                 <span class="pass-btn__sub">−$1,000 to jackpot · skip this question</span>
@@ -365,9 +399,7 @@ function renderAnswering() {
                      ? "Can't use a pass on the 1% question."
                      : "Available starting at the 50% question."
                }</p>`
-            : usedPass
-              ? `<p class="pass-hint">Pass already used.</p>`
-              : ''
+            : ''
         }
       </div>
     </div>
@@ -620,16 +652,134 @@ function render() {
   }
 }
 
+async function submitChoice(text) {
+  const letter = String(text || '').toUpperCase();
+  if (!letter || state?.phase !== 'answering') return;
+  // Optimistic UI + cancel superseded in-flight submits of older letters
+  answerDraft = letter;
+  joinError = '';
+  syncChoiceSelection(letter);
+  hapticPulse();
+  ensureConnected();
+
+  const token = Symbol(letter);
+  submitInFlight = token;
+  try {
+    await act('submit_answer', { text: letter }, { retry: true });
+  } catch {
+    // shown via joinError
+  } finally {
+    if (submitInFlight === token) submitInFlight = null;
+  }
+}
+
+async function submitPass() {
+  const p = me();
+  if (state?.phase !== 'answering') return;
+  if (state.questionIndex === 14) {
+    joinError = "Can't use a pass on the 1% question.";
+    answeringViewKey = '';
+    render();
+    return;
+  }
+  if (!p?.hasPass || p?.usedPass) {
+    joinError = "Can't use until the 50% question.";
+    answeringViewKey = '';
+    render();
+    return;
+  }
+  joinError = '';
+  hapticPulse();
+  ensureConnected();
+  const passEl = document.getElementById('passBtn');
+  passEl?.classList.add('is-pressed');
+  try {
+    await act('use_pass', {}, { retry: true });
+  } catch {
+    // shown via joinError
+  } finally {
+    passEl?.classList.remove('is-pressed');
+  }
+}
+
+/** Resolve actionable control from any nested tap target (letter spans, etc.). */
+function actionTargetFromEvent(e) {
+  const el = e.target;
+  if (!(el instanceof Element)) return null;
+  const choice = el.closest('[data-choice]');
+  if (choice && main.contains(choice)) return { type: 'choice', el: choice, letter: choice.dataset.choice };
+  const pass = el.closest('#passBtn');
+  if (pass && main.contains(pass) && !pass.classList.contains('pass-btn--locked')) {
+    return { type: 'pass', el: pass };
+  }
+  return null;
+}
+
+// Immediate pressed feedback on pointer/touch (before click fires)
+main.addEventListener(
+  'pointerdown',
+  (e) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    const action = actionTargetFromEvent(e);
+    if (!action) return;
+    if (action.type === 'choice') {
+      action.el.classList.add('is-pressed');
+      const letter = String(action.letter || '').toUpperCase();
+      answerDraft = letter;
+      syncChoiceSelection(letter);
+    } else if (action.type === 'pass') {
+      action.el.classList.add('is-pressed');
+    }
+  },
+  { passive: true },
+);
+
+main.addEventListener(
+  'pointerup',
+  (e) => {
+    document.querySelectorAll('.choice-btn.is-pressed, .pass-btn.is-pressed').forEach((btn) => {
+      btn.classList.remove('is-pressed');
+    });
+  },
+  { passive: true },
+);
+
+main.addEventListener(
+  'pointercancel',
+  () => {
+    document.querySelectorAll('.choice-btn.is-pressed, .pass-btn.is-pressed').forEach((btn) => {
+      btn.classList.remove('is-pressed');
+    });
+  },
+  { passive: true },
+);
+
 main.addEventListener('click', async (e) => {
   const t = e.target;
-  if (!(t instanceof HTMLElement)) return;
+  if (!(t instanceof Element)) return;
+
+  // Answer / pass — resolve via closest so child spans register
+  const answerAction = actionTargetFromEvent(e);
+  if (answerAction?.type === 'choice') {
+    e.preventDefault();
+    await submitChoice(answerAction.letter);
+    return;
+  }
+  if (answerAction?.type === 'pass') {
+    e.preventDefault();
+    await submitPass();
+    return;
+  }
+
+  const btn = t.closest('button, [id]');
+  const id = btn?.id || (t instanceof HTMLElement ? t.id : '');
 
   try {
-    if (t.id === 'volumePlayBtn' || t.id === 'volumeReplayBtn') {
-      await playVolumeTest(t);
+    if (id === 'volumePlayBtn' || id === 'volumeReplayBtn') {
+      await playVolumeTest(btn || t);
       return;
     }
-    if (t.id === 'volumeHeardBtn') {
+    if (id === 'volumeHeardBtn') {
       volumeReady = true;
       volumeGateStep = 'ask';
       try {
@@ -640,7 +790,7 @@ main.addEventListener('click', async (e) => {
       render();
       return;
     }
-    if (t.id === 'volumeNoBtn') {
+    if (id === 'volumeNoBtn') {
       volumeGateStep = 'ask';
       volumeReady = false;
       render();
@@ -650,64 +800,39 @@ main.addEventListener('click', async (e) => {
       });
       return;
     }
-    if (t.id === 'joinBtn') {
+    if (id === 'joinBtn') {
       const name = document.getElementById('nameInput')?.value?.trim() || '';
       playerName = name;
       await act('join', { name, playerId });
       return;
     }
-    if (t.id === 'lockBtn') {
+    if (id === 'lockBtn') {
       // Legacy free-text lock — packs are multiple-choice only now
       const text = answerDraft || '';
-      await act('submit_answer', { text });
+      await act('submit_answer', { text }, { retry: true });
       return;
     }
-    if (t.dataset?.choice) {
-      const text = String(t.dataset.choice).toUpperCase();
-      answerDraft = text;
-      answeringViewKey = '';
-      await act('submit_answer', { text });
-      return;
-    }
-    if (t.id === 'passBtn') {
-      const p = me();
-      if (state.questionIndex === 14) {
-        joinError = "Can't use a pass on the 1% question.";
-        answeringViewKey = '';
-        render();
-        return;
-      }
-      if (!p?.hasPass || p?.usedPass) {
-        joinError = "Can't use until the 50% question.";
-        answeringViewKey = '';
-        render();
-        return;
-      }
-      joinError = '';
-      await act('use_pass');
-      return;
-    }
-    if (t.id === 'leaveBtn') {
+    if (id === 'leaveBtn') {
       await act('cashout_decide', { leave: true });
       return;
     }
-    if (t.id === 'stayBtn') {
+    if (id === 'stayBtn') {
       await act('cashout_decide', { leave: false });
       return;
     }
-    if (t.id === 'take10kBtn') {
+    if (id === 'take10kBtn') {
       await act('final_decide', { take10k: true });
       return;
     }
-    if (t.id === 'go1Btn') {
+    if (id === 'go1Btn') {
       await act('final_decide', { take10k: false });
       return;
     }
-    if (t.id === 'solo10k') {
+    if (id === 'solo10k') {
       await act('solo_decide', { take10k: true });
       return;
     }
-    if (t.id === 'solo1') {
+    if (id === 'solo1') {
       await act('solo_decide', { take10k: false });
       return;
     }
@@ -831,8 +956,13 @@ function maybePlayOutSound(p) {
 
 function onState(next) {
   const prevPhase = state?.phase;
+  const prevQ = state?.questionIndex;
   state = next;
   hideBoot();
+  if (next.phase !== 'answering' || next.questionIndex !== prevQ) {
+    answerDraft = '';
+    answeringViewKey = '';
+  }
   if (
     prevPhase === 'eliminating' &&
     (next.phase === 'eliminated_count' ||

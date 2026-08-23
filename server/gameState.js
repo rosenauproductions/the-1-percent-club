@@ -762,7 +762,8 @@ export function submitAnswer(state, playerId, text) {
   if (state.phase !== 'answering') throw new Error('Not accepting answers');
   const player = state.players.find((p) => p.id === playerId);
   if (!player || player.status !== 'active') throw new Error('Not an active player');
-  if (state.answers[playerId]?.locked) throw new Error('Already locked in');
+  // Pass is final; letter answers can change until the answering phase ends.
+  if (state.answers[playerId]?.usedPass) throw new Error('Already used pass');
 
   const trimmed = String(text ?? '').trim().slice(0, 80);
   if (!trimmed) throw new Error('Answer required');
@@ -796,9 +797,9 @@ export function usePass(state, playerId) {
   const player = state.players.find((p) => p.id === playerId);
   if (!player || player.status !== 'active') throw new Error('Not an active player');
   if (!player.hasPass || player.usedPass) throw new Error('No pass available');
-  if (state.answers[playerId]?.locked) throw new Error('Already locked in');
+  if (state.answers[playerId]?.usedPass) throw new Error('Already used pass');
 
-  // Using a pass puts $1000 into the jackpot
+  // Using a pass puts $1000 into the jackpot (final — replaces any prior letter answer)
   const players = state.players.map((p) =>
     p.id === playerId ? { ...p, usedPass: true, hasPass: false, stakeInJackpot: true } : p,
   );
