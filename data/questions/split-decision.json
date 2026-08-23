@@ -61,8 +61,9 @@
     {
       "percent": 40,
       "prompt": "I have a stack of colorful paper clips and rubber bands, which are shaped like this. How many paper clips can be seen in the stack?",
-      "answerType": "number",
-      "accepted": ["7", "seven"],
+      "answerType": "abcd",
+      "choices": ["5", "6", "7", "8"],
+      "accepted": ["C", "7", "seven"],
       "explanation": "Count only the shapes with the internal paper-clip loop — there are 7.",
       "image": "40a.png",
       "solutionImage": "40b.png"
@@ -79,8 +80,9 @@
     {
       "percent": 30,
       "prompt": "A time traveler from the year 6177 wanted to travel back in time, but her time machine can only send her back to the closest year in the past that uses all four of those exact digits. What year can she visit?",
-      "answerType": "number",
-      "accepted": ["1776", "seventeen seventy six", "seventeen seventy-six"],
+      "answerType": "abcd",
+      "choices": ["1677", "1716", "1767", "1776"],
+      "accepted": ["D", "1776", "seventeen seventy six", "seventeen seventy-six"],
       "explanation": "No other combination of those four numbers results in a more recent year in the past.",
       "image": "30a.png",
       "solutionImage": "30b.png"
@@ -88,8 +90,9 @@
     {
       "percent": 25,
       "prompt": "What is the answer to the question written on the cut-out piece of paper?",
-      "answerType": "letter",
-      "accepted": ["E"],
+      "answerType": "abcd",
+      "choices": ["E", "P", "T", "A"],
+      "accepted": ["A", "E"],
       "explanation": "The question is 'WHAT LETTER APPEARS MOST OFTEN ON THIS PIECE OF PAPER?' E appears 7 times.",
       "image": "25a.png",
       "solutionImage": "25b.png"
@@ -97,9 +100,9 @@
     {
       "percent": 20,
       "prompt": "If you rearranged the words in this fascinating question so that the words with the fewest total letters were first and the word with the most letters was last, which word would then be second to last?",
-      "answerType": "text",
-      "fuzzy": true,
-      "accepted": ["Rearranged"],
+      "answerType": "abcd",
+      "choices": ["fascinating", "rearranged", "question", "letters"],
+      "accepted": ["B", "Rearranged", "rearranged"],
       "explanation": "'Fascinating' has 11 letters so that would go last. 'Rearranged' has the second most letters, with 10, so it would go second to last.",
       "image": "20a.png",
       "solutionImage": "20b.png"
@@ -107,8 +110,9 @@
     {
       "percent": 15,
       "prompt": "Adding the correct three letters to the blanks before each of these groups of letters will give you 4 connected words. What three letters should replace the red question marks to make the first word in this well-known group?",
-      "answerType": "text",
-      "accepted": ["WIN", "W I N"],
+      "answerType": "abcd",
+      "choices": ["WIN", "SUM", "SPR", "AUT"],
+      "accepted": ["A", "WIN", "W I N"],
       "explanation": "The graphic shows the right half of the four seasons. So the letters that belong before 'TER' are 'WIN'.",
       "image": "15a.png",
       "solutionImage": "15b.png"
@@ -116,9 +120,9 @@
     {
       "percent": 10,
       "prompt": "Charlie can pull an unlimited number of the five letters pictured here out of his magic hat. What is the longest word he could conjure with this trick?",
-      "answerType": "text",
-      "fuzzy": true,
-      "accepted": ["ABRACADABRA"],
+      "answerType": "abcd",
+      "choices": ["ABRACADABRA", "BARRACUDA", "CADABRA", "ABRA"],
+      "accepted": ["A", "ABRACADABRA"],
       "explanation": "The 11-letter word uses 5 A's, 2 B's, 2 R's, 1 D, and 1 C.",
       "image": "10a.png",
       "solutionImage": "10b.png"
@@ -126,8 +130,9 @@
     {
       "percent": 5,
       "prompt": "Each of these numbers has the exact same amount of a given thing. Logically, what number should come next in this sequence?",
-      "answerType": "number",
-      "accepted": ["12", "twelve"],
+      "answerType": "abcd",
+      "choices": ["10", "11", "12", "13"],
+      "accepted": ["C", "12", "twelve"],
       "explanation": "Each of the words has two, and only two, vowels. The next number with two vowels is twelve.",
       "image": "5a.png",
       "solutionImage": "5b.png"
@@ -135,8 +140,9 @@
     {
       "percent": 1,
       "prompt": "To build a snowman, I need one carrot, one hat, two sticks, and two rocks. I have twice as many hats as rocks, twice as many sticks as hats, and twice as many carrots as sticks. I make two snowmen and then I'm out of rocks. How many carrots do I have left?",
-      "answerType": "number",
-      "accepted": ["30", "thirty"],
+      "answerType": "abcd",
+      "choices": ["16", "28", "30", "32"],
+      "accepted": ["C", "30", "thirty"],
       "explanation": "To make two snowmen with no rocks left over, I must have started with 4 rocks, which means I had 8 hats, 16 sticks, and 32 carrots. Two carrots were used for the snowmen, so I have 30 left.",
       "image": "1a.png",
       "solutionImage": "1b.png"

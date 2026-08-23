@@ -1,4 +1,4 @@
-/** @typedef {'lobby'|'intro'|'question'|'answering'|'eliminating'|'eliminated_count'|'left_count'|'answer_reveal'|'prize_pot'|'reveal'|'cashout_offer'|'final_choice'|'solo_offer'|'finale'|'game_end'} Phase */
+/** @typedef {'lobby'|'intro'|'pass_briefing'|'question'|'answering'|'eliminating'|'eliminated_count'|'left_count'|'answer_reveal'|'prize_pot'|'reveal'|'cashout_offer'|'final_choice'|'solo_offer'|'finale'|'game_end'} Phase */
 /** @typedef {'active'|'out'|'cashed'|'took10k'|'winner'} PlayerStatus */
 
 export const STAKE = 1000;
@@ -34,31 +34,30 @@ export function makePlayerId() {
   return `p_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-/** @typedef {'text'|'number'|'letter'|'ab'|'abc'|'abcd'} AnswerType */
+/** @typedef {'ab'|'abc'|'abcd'} AnswerType */
 
 const LETTER_TYPE_COUNT = { ab: 2, abc: 3, abcd: 4 };
 
+/**
+ * All live questions are multiple-choice (AB / ABC / ABCD).
+ * Free-text / number / letter pack modes coerce from choices length, else ABCD.
+ */
 export function normalizeAnswerType(raw, choices = []) {
   const s = String(raw ?? '')
     .toLowerCase()
     .trim()
     .replace(/[^a-z]/g, '');
-  if (
-    s === 'text' ||
-    s === 'number' ||
-    s === 'letter' ||
-    s === 'ab' ||
-    s === 'abc' ||
-    s === 'abcd'
-  ) {
-    return s;
-  }
+  if (s === 'ab' || s === 'abc' || s === 'abcd') return s;
+
   const n = Array.isArray(choices) ? choices.length : 0;
   if (n === 2) return 'ab';
   if (n === 4) return 'abcd';
-  if (n >= 3) return 'abc';
+  if (n === 3 || n > 4) return 'abc';
   if (n > 0) return 'abc';
-  return 'text';
+
+  // Legacy free-text / number / letter packs → default pad
+  if (s === 'text' || s === 'number' || s === 'letter' || !s) return 'abcd';
+  return 'abc';
 }
 
 /** Letter labels for AB / ABC / ABCD pads. */
@@ -172,23 +171,16 @@ export function expandAcceptedAnswers(accepted, choices = [], answerType = 'text
 }
 
 export function answersMatch(given, acceptedList, opts = {}) {
-  const answerType = opts.answerType || 'text';
+  const answerType = opts.answerType || 'abc';
   const fuzzy = opts.fuzzy === true;
   const n = canonicalizeAnswer(given);
   if (!n) return false;
   const accepted = (acceptedList ?? []).map(canonicalizeAnswer).filter(Boolean);
   if (!accepted.length) return false;
 
-  if (answerType === 'letter') {
-    const letter = n
-      .replace(/^the\s+/, '')
-      .replace(/^letter\s+/, '')
-      .replace(/\s+/g, '');
-    const g = letter.length === 1 ? letter : letter.slice(0, 1);
-    return accepted.some((a) => {
-      const al = a.replace(/^the\s+/, '').replace(/^letter\s+/, '').replace(/\s+/g, '');
-      return al === g || al === letter;
-    });
+  // Multiple-choice pads: prefer exact letter match first
+  if (LETTER_TYPE_COUNT[answerType] && /^[a-d]$/.test(n)) {
+    if (accepted.some((a) => a === n)) return true;
   }
 
   if (accepted.some((a) => a === n)) return true;
@@ -229,9 +221,20 @@ function defaultSetup() {
     questionFile: 'split-decision.json',
     answerSeconds: ANSWER_SECONDS,
     masterVolume: 0.7,
+    /** Soft intro bed level (display uses this on intro cues). */
+    introVolume: 0.2,
+    /** When true, cut the answer window to ~3s once everyone has locked. Default off. */
+    fastFinishWhenAllLocked: false,
     skipIntro: false,
     sounds: {},
   };
+}
+
+/** Intro bed volume from setup (default 0.2). */
+export function introVolumeFromSetup(setup) {
+  const v = Number(setup?.introVolume);
+  if (!Number.isFinite(v)) return 0.2;
+  return Math.max(0, Math.min(1, v));
 }
 
 /** Estimated length of one eliminating.mp3 play (server fallback timer). */
@@ -420,9 +423,20 @@ function awardOnePercentWinners(state) {
 }
 
 export function applySetup(state, setup) {
+  const next = { ...state.setup, ...setup };
+  if (setup && Object.prototype.hasOwnProperty.call(setup, 'introVolume')) {
+    next.introVolume = introVolumeFromSetup({ introVolume: setup.introVolume });
+  }
+  if (setup && Object.prototype.hasOwnProperty.call(setup, 'fastFinishWhenAllLocked')) {
+    next.fastFinishWhenAllLocked = !!setup.fastFinishWhenAllLocked;
+  }
+  if (setup && Object.prototype.hasOwnProperty.call(setup, 'masterVolume')) {
+    const mv = Number(setup.masterVolume);
+    next.masterVolume = Number.isFinite(mv) ? Math.max(0, Math.min(1, mv)) : state.setup.masterVolume;
+  }
   return {
     ...state,
-    setup: { ...state.setup, ...setup },
+    setup: next,
   };
 }
 
@@ -602,10 +616,13 @@ export function startGame(state, questions, packName = null, packSettings = null
       winnings: 0,
       stakeInJackpot: false,
     })),
+    _passBriefingDone: false,
+    _cashoutDone: false,
   };
 
   // Soft loop so the host can talk over the show open before questions.
-  next = cue(next, 'intro', { loop: true, volume: 0.2 });
+  const introVol = introVolumeFromSetup(state.setup);
+  next = cue(next, 'intro', { loop: true, volume: introVol });
   next = actionMeta(next, 'start_game');
   next.phase = state.setup.skipIntro ? 'question' : 'intro';
 
@@ -620,8 +637,7 @@ export function skipIntro(state) {
   return beginQuestion({ ...state, soundCue: null }, 0);
 }
 
-function grantPassesIfNeeded(state, questionIndex) {
-  if (questionIndex !== PASS_QUESTION_INDEX) return state;
+function grantPasses(state) {
   return {
     ...cue(state, 'pass'),
     players: state.players.map((p) =>
@@ -633,6 +649,27 @@ function grantPassesIfNeeded(state, questionIndex) {
 export function beginQuestion(state, questionIndex) {
   if (questionIndex < 0 || questionIndex >= PERCENTAGES.length) {
     throw new Error('Invalid question index');
+  }
+
+  // Host pause to explain passes before the 50% question
+  if (
+    questionIndex === PASS_QUESTION_INDEX &&
+    state.phase !== 'pass_briefing' &&
+    !state._passBriefingDone
+  ) {
+    const briefed = grantPasses(state);
+    return actionMeta(
+      {
+        ...briefed,
+        phase: 'pass_briefing',
+        cashoutDecisions: {},
+        pendingAfterReveal: null,
+        questionIndex: questionIndex - 1,
+        currentQuestion: null,
+        _awaitingQuestionIndex: questionIndex,
+      },
+      'pass_briefing',
+    );
   }
 
   // Cashout must happen before 30% question
@@ -656,11 +693,11 @@ export function beginQuestion(state, questionIndex) {
     }
   }
 
-  let next = grantPassesIfNeeded(state, questionIndex);
-  const q = next.questions[questionIndex];
+  const q = state.questions[questionIndex];
+  const introVol = introVolumeFromSetup(state.setup);
 
-  next = {
-    ...next,
+  let next = {
+    ...state,
     phase: 'question',
     questionIndex,
     currentQuestion: q,
@@ -670,19 +707,35 @@ export function beginQuestion(state, questionIndex) {
     reveal: null,
     elimination: null,
     pendingAfterReveal: null,
-    _cashoutDone: questionIndex >= CASHOUT_QUESTION_INDEX ? true : next._cashoutDone,
+    _cashoutDone: questionIndex >= CASHOUT_QUESTION_INDEX ? true : state._cashoutDone,
+    _passBriefingDone:
+      questionIndex >= PASS_QUESTION_INDEX ? true : state._passBriefingDone,
     _awaitingQuestionIndex: undefined,
   };
 
   // After intro talk, first-question hold keeps a soft one-shot bed; later holds are silent.
   if (questionIndex === 0) {
     return actionMeta(
-      cue(next, 'intro', { loop: false, volume: 0.2 }),
+      cue(next, 'intro', { loop: false, volume: introVol }),
       'begin_question',
       { questionIndex },
     );
   }
   return actionMeta({ ...next, soundCue: null }, 'begin_question', { questionIndex });
+}
+
+/** Host finished explaining passes — continue into the 50% question. */
+export function resolvePassBriefing(state) {
+  if (state.phase !== 'pass_briefing') throw new Error('Not in pass briefing');
+  const nextIndex = state._awaitingQuestionIndex ?? PASS_QUESTION_INDEX;
+  return beginQuestion(
+    {
+      ...state,
+      _passBriefingDone: true,
+      soundCue: null,
+    },
+    nextIndex,
+  );
 }
 
 export function startAnswering(state) {

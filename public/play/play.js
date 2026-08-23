@@ -246,7 +246,7 @@ let answeringViewKey = '';
 
 function answeringKey() {
   const p = me();
-  const mode = state?.currentQuestion?.answerType || 'text';
+  const mode = state?.currentQuestion?.answerType || 'abc';
   return `${state?.phase}:${state?.questionIndex}:${state?.myAnswer?.locked || state?.answers?.[playerId]?.locked || false}:${!!p?.hasPass}:${!!p?.usedPass}:${joinError}:${mode}`;
 }
 
@@ -305,11 +305,10 @@ function renderAnswering() {
     return;
   }
 
-  // Keep the input mounted — only refresh the countdown while typing
+  // Keep the pad mounted — only refresh the countdown while choosing
   const key = answeringKey();
-  const existing = document.getElementById('answerInput');
   const existingChoices = document.getElementById('choicePad');
-  if ((existing || existingChoices) && answeringViewKey === key) {
+  if (existingChoices && answeringViewKey === key) {
     updateTimerOnly();
     const err = document.getElementById('answerError');
     if (err) {
@@ -319,23 +318,22 @@ function renderAnswering() {
     return;
   }
 
-  // Preserve whatever they already typed across rare full rebuilds
-  if (existing) answerDraft = existing.value;
   answeringViewKey = key;
 
-  const answerType = q?.answerType || 'text';
+  const answerType = q?.answerType || 'abc';
   const letterModes = { ab: ['A', 'B'], abc: ['A', 'B', 'C'], abcd: ['A', 'B', 'C', 'D'] };
-  const choiceLetters = letterModes[answerType] || null;
-  const isChoiceQuestion = !!choiceLetters;
-  const isNumber = answerType === 'number';
-  const isLetter = answerType === 'letter';
+  const choiceLetters = letterModes[answerType] || letterModes.abc;
+  const choiceLabels = Array.isArray(q?.choices) ? q.choices : [];
 
-  const answerControls = isChoiceQuestion
-    ? `<div class="choice-pad" id="choicePad" role="group" aria-label="Answer choices">
+  const answerControls = `<div class="choice-pad" id="choicePad" role="group" aria-label="Answer choices">
         ${choiceLetters
-          .map((letter) => {
+          .map((letter, i) => {
             const selected = answerDraft.toUpperCase() === letter ? ' is-selected' : '';
-            return `<button type="button" class="choice-btn${selected}" data-choice="${letter}">${letter}</button>`;
+            const label = choiceLabels[i] ? String(choiceLabels[i]) : '';
+            return `<button type="button" class="choice-btn${selected}${label ? ' choice-btn--labeled' : ''}" data-choice="${letter}">
+              <span class="choice-btn__letter">${letter}</span>
+              ${label ? `<span class="choice-btn__label">${escapeHtml(label)}</span>` : ''}
+            </button>`;
           })
           .join('')}
       </div>
@@ -344,16 +342,7 @@ function renderAnswering() {
           ? 'A or B'
           : `A–${choiceLetters[choiceLetters.length - 1]}`
       } to lock in</p>
-      <p class="error" id="answerError" style="display:${joinError ? 'block' : 'none'}">${escapeHtml(joinError || '')}</p>`
-    : `<label class="field">Your answer
-          <input id="answerInput" type="text" inputmode="${
-            isNumber ? 'decimal' : isLetter ? 'text' : 'text'
-          }" maxlength="${isLetter ? '3' : '80'}" placeholder="${
-            isNumber ? 'Number or word' : isLetter ? 'Letter' : 'Type your answer'
-          }" autocomplete="off" enterkeyhint="done" ${isLetter ? 'autocapitalize="characters"' : ''} />
-        </label>
-        <p class="error" id="answerError" style="display:${joinError ? 'block' : 'none'}">${escapeHtml(joinError || '')}</p>
-        <button class="btn-primary big-btn" id="lockBtn">Lock in</button>`;
+      <p class="error" id="answerError" style="display:${joinError ? 'block' : 'none'}">${escapeHtml(joinError || '')}</p>`;
 
   main.innerHTML = `
     <div class="pct">${q?.percent}%</div>
@@ -364,8 +353,10 @@ function renderAnswering() {
         ${answerControls}
         ${
           showPassBtn
-            ? `<button class="btn-ghost big-btn ${canUsePass ? '' : 'pass-btn--locked'}" id="passBtn" type="button">
-                Use PASS (−$1,000 to jackpot)
+            ? `<button class="pass-btn ${canUsePass ? '' : 'pass-btn--locked'}" id="passBtn" type="button">
+                <span class="pass-btn__eyebrow">SAFETY NET</span>
+                <span class="pass-btn__title">USE PASS</span>
+                <span class="pass-btn__sub">−$1,000 to jackpot · skip this question</span>
                </button>
                <p class="pass-hint" id="passHint">${
                  canUsePass
@@ -381,15 +372,29 @@ function renderAnswering() {
       </div>
     </div>
   `;
-  const input = document.getElementById('answerInput');
-  if (input) {
-    input.value = answerDraft;
-    input.addEventListener('input', () => {
-      answerDraft = input.value;
-    });
-    // Focus once when the pad appears, not on every tick
-    input.focus({ preventScroll: true });
-  }
+  // Letter pad only — no free-text focus
+}
+
+function renderPassBriefing() {
+  const p = me();
+  const hasPass = !!p?.hasPass && !p?.usedPass;
+  main.innerHTML = `
+    <div class="hero pass-granted">
+      <div class="status-pill win">PASS UNLOCKED</div>
+      <img
+        class="pass-granted__art"
+        src="/images/pass-available-placeholder.png"
+        alt="Now you can use the pass — temporary placeholder"
+      />
+      <h1>You have a PASS</h1>
+      <p class="muted">${
+        hasPass
+          ? 'One free escape on a later question. Using it puts $1,000 in the jackpot.'
+          : 'Listen to the host — passes are being explained.'
+      }</p>
+      <p class="muted" style="margin-top:0.75rem">Hang tight for the 50% question.</p>
+    </div>
+  `;
 }
 
 function renderCashout() {
@@ -564,6 +569,9 @@ function render() {
     case 'intro':
       main.innerHTML = `<div class="hero"><h1>Here we go</h1><p class="muted">Watch the intro on the TV</p></div>`;
       break;
+    case 'pass_briefing':
+      renderPassBriefing();
+      break;
     case 'question':
     case 'answering':
       renderAnswering();
@@ -649,8 +657,8 @@ main.addEventListener('click', async (e) => {
       return;
     }
     if (t.id === 'lockBtn') {
-      const text = document.getElementById('answerInput')?.value || answerDraft || '';
-      answerDraft = text;
+      // Legacy free-text lock — packs are multiple-choice only now
+      const text = answerDraft || '';
       await act('submit_answer', { text });
       return;
     }

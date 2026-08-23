@@ -10,6 +10,7 @@ import {
   playEliminatingUntilStopped,
   stopPendingEliminating,
   seekTimerToEnd,
+  TIMER_STING_SEC,
 } from '../shared/audio.js';
 import { installErrorHandlers, mountQaWidget, showBoot, hideBoot } from '../shared/boot.js';
 import { scanSpotlightId } from '../shared/elimScan.js';
@@ -27,6 +28,8 @@ let state = null;
 let lastSoundAt = null;
 let timerInterval = null;
 let scanTick = null;
+/** Seek into timer ending sting once per answer window. */
+let timerEndSeeked = false;
 
 function money(n) {
   return `$${Number(n || 0).toLocaleString('en-US')}`;
@@ -145,6 +148,16 @@ function startTimerTick() {
     if (state?.phase !== 'answering') return;
     const secs = secondsLeft();
     const total = answerSecondsTotal();
+    // Play the timer ending sting only when the countdown is truly winding down
+    if (
+      secs !== null &&
+      secs > 0 &&
+      secs <= TIMER_STING_SEC &&
+      !timerEndSeeked
+    ) {
+      timerEndSeeked = true;
+      seekTimerToEnd(Math.max(0.5, secs));
+    }
     const badge = document.getElementById('pctTimerBadge');
     if (badge) {
       if (secs != null && secs <= 0) {
@@ -610,6 +623,17 @@ function renderReveal() {
   `;
 }
 
+function renderPassBriefing() {
+  main.innerHTML = `
+    <div class="center-phase">
+      <h1>YOU NOW HAVE A <span class="pct">PASS</span></h1>
+      <p>One free escape. Using it puts $1,000 into the prize pot.</p>
+      <p>Listen to the host — then the 50% question.</p>
+      <div class="side-grid" style="width:70%;max-height:40%">${renderSeatGrid(state.players.filter((p) => p.status === 'active'))}</div>
+    </div>
+  `;
+}
+
 function renderCashout() {
   main.innerHTML = `
     <div class="center-phase">
@@ -709,6 +733,9 @@ function render() {
     case 'intro':
       renderIntro();
       break;
+    case 'pass_briefing':
+      renderPassBriefing();
+      break;
     case 'question':
     case 'answering':
       renderQuestion();
@@ -768,7 +795,8 @@ async function handleSoundCue(cue) {
   }
 
   if (cue.name === 'timer_seek') {
-    const fromEnd = cue.secondsFromEnd ?? 3;
+    const fromEnd = cue.secondsFromEnd ?? TIMER_STING_SEC;
+    timerEndSeeked = true;
     if (!seekTimerToEnd(fromEnd)) {
       stopAllMusic();
       await playSound('timer', { asMusic: false });
@@ -834,11 +862,13 @@ async function handleSoundCue(cue) {
     return;
   }
 
+  const setupIntro =
+    typeof state?.setup?.introVolume === 'number' ? state.setup.introVolume : 0.2;
   const volume =
     typeof cue.volume === 'number'
       ? cue.volume
       : cue.name === 'intro'
-        ? 0.2
+        ? setupIntro
         : undefined;
   await playSound(cue.name, {
     loop: looping,
@@ -881,7 +911,10 @@ function onState(next) {
   }
   render();
   ensureScanTick();
-  if (next.phase === 'answering') startTimerTick();
+  if (next.phase === 'answering') {
+    if (prevPhase !== 'answering') timerEndSeeked = false;
+    startTimerTick();
+  }
   handleSoundCue(next.soundCue);
 }
 

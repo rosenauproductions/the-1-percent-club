@@ -19,6 +19,11 @@ let masterVolume = 0.7;
 const musicTracks = new Set();
 /** Active one-shot timer bed (for early-lock seek). */
 let timerTrack = null;
+/** When true, timer may play the last ~3s ending sting. */
+let timerAllowEnding = false;
+let timerBodyLoopCleanup = null;
+/** Last ~3 seconds of timer.mp3 are an ending sting — loop the body until then. */
+export const TIMER_STING_SEC = 3;
 let audioActivated = false;
 let pendingSfx = null;
 const mutedPending = new Set();
@@ -141,6 +146,11 @@ function soundSrc(name) {
 }
 
 export function stopAllMusic() {
+  if (timerBodyLoopCleanup) {
+    timerBodyLoopCleanup();
+    timerBodyLoopCleanup = null;
+  }
+  timerAllowEnding = false;
   for (const audio of musicTracks) {
     audio.pause();
     audio.currentTime = 0;
@@ -150,13 +160,19 @@ export function stopAllMusic() {
 }
 
 /**
- * Jump the playing timer bed to the last N seconds (everyone locked early).
+ * Jump the playing timer bed to the last N seconds (everyone locked early,
+ * or the answer window is truly winding down).
  * @param {number} [secondsFromEnd=3]
  */
 export function seekTimerToEnd(secondsFromEnd = 3) {
   const audio = timerTrack;
   if (!audio) return false;
-  const fromEnd = Math.max(0.5, Number(secondsFromEnd) || 3);
+  timerAllowEnding = true;
+  if (timerBodyLoopCleanup) {
+    timerBodyLoopCleanup();
+    timerBodyLoopCleanup = null;
+  }
+  const fromEnd = Math.max(0.5, Number(secondsFromEnd) || TIMER_STING_SEC);
   const apply = () => {
     const dur = audio.duration;
     if (!Number.isFinite(dur) || dur <= 0) return false;
@@ -168,6 +184,37 @@ export function seekTimerToEnd(secondsFromEnd = 3) {
   }
   audio.addEventListener('loadedmetadata', () => apply(), { once: true });
   return true;
+}
+
+/**
+ * Loop everything except the last TIMER_STING_SEC until seekTimerToEnd()
+ * (or the countdown naturally hits the ending window).
+ */
+function attachTimerBodyLoop(audio) {
+  if (timerBodyLoopCleanup) {
+    timerBodyLoopCleanup();
+    timerBodyLoopCleanup = null;
+  }
+  timerAllowEnding = false;
+
+  const onTimeUpdate = () => {
+    if (timerAllowEnding || timerTrack !== audio) return;
+    const dur = audio.duration;
+    if (!Number.isFinite(dur) || dur <= TIMER_STING_SEC + 0.25) return;
+    const bodyEnd = dur - TIMER_STING_SEC;
+    if (audio.currentTime >= bodyEnd - 0.04) {
+      try {
+        audio.currentTime = 0.05;
+      } catch {
+        // ignore seek errors mid-buffer
+      }
+    }
+  };
+
+  audio.addEventListener('timeupdate', onTimeUpdate);
+  timerBodyLoopCleanup = () => {
+    audio.removeEventListener('timeupdate', onTimeUpdate);
+  };
 }
 
 async function beginPlayback(audio, targetVolume, { name, loop }) {
@@ -261,10 +308,15 @@ export async function playSound(
 
   if (name === 'timer' && !loop) {
     timerTrack = audio;
+    attachTimerBodyLoop(audio);
     audio.addEventListener(
       'ended',
       () => {
         if (timerTrack === audio) timerTrack = null;
+        if (timerBodyLoopCleanup) {
+          timerBodyLoopCleanup();
+          timerBodyLoopCleanup = null;
+        }
       },
       { once: true },
     );

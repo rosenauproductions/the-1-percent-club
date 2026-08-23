@@ -33,6 +33,7 @@ import {
   hostOverride,
   cashoutDecide,
   resolveCashout,
+  resolvePassBriefing,
   finalDecide,
   resolveFinalChoice,
   startOnePercent,
@@ -130,6 +131,7 @@ function nextThumpGap() {
 
 /** Everyone locked — cut remaining answer window to 3s and seek timer bed. */
 function maybeShortenTimerForAllLocked() {
+  if (!state.setup?.fastFinishWhenAllLocked) return;
   if (state.phase !== 'answering') return;
   const active = activeCount(state);
   if (active < 1) return;
@@ -392,7 +394,11 @@ async function handleAction(action, payload = {}, meta = {}) {
     case 'advance':
       requireHost(role);
       clearElimTimers();
-      state = advanceAfterReveal(state);
+      if (state.phase === 'pass_briefing') {
+        state = resolvePassBriefing(state);
+      } else {
+        state = advanceAfterReveal(state);
+      }
       if (state.phase === 'answering') scheduleAnswerTimer();
       schedulePostElimBoards();
       break;
@@ -404,6 +410,11 @@ async function handleAction(action, payload = {}, meta = {}) {
     case 'resolve_cashout':
       requireHost(role);
       state = resolveCashout(state);
+      break;
+
+    case 'resolve_pass_briefing':
+      requireHost(role);
+      state = resolvePassBriefing(state);
       break;
 
     case 'final_decide':

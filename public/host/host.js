@@ -115,8 +115,16 @@ function renderLobby() {
         <label class="field">Answer seconds
           <input id="secsInput" type="number" min="10" max="120" value="${state.setup.answerSeconds || 30}" />
         </label>
-        <label class="field">Volume (0–1)
+        <label class="field">Master volume (0–1)
           <input id="volInput" type="number" min="0" max="1" step="0.05" value="${state.setup.masterVolume ?? 0.7}" />
+        </label>
+        <label class="field">Intro music volume (0–1)
+          <input id="introVolInput" type="range" min="0" max="1" step="0.05" value="${state.setup.introVolume ?? 0.2}" />
+          <span class="muted" id="introVolLabel">${Math.round((state.setup.introVolume ?? 0.2) * 100)}%</span>
+        </label>
+        <label class="field" style="flex-direction:row;align-items:center;gap:0.5rem">
+          <input id="fastFinish" type="checkbox" ${state.setup.fastFinishWhenAllLocked ? 'checked' : ''} />
+          Fast finish when everyone locks (cut timer to ~3s)
         </label>
         <label class="field" style="flex-direction:row;align-items:center;gap:0.5rem">
           <input id="skipIntro" type="checkbox" ${state.setup.skipIntro ? 'checked' : ''} />
@@ -137,14 +145,41 @@ function renderLobby() {
 }
 
 function renderIntro() {
+  const introPct = Math.round((state.setup?.introVolume ?? 0.2) * 100);
   main.innerHTML = `
     <div class="card">
       <h2>Intro</h2>
       <p class="muted">${state.players.length} players ready</p>
       <p style="margin:0.65rem 0 0;font-weight:700;line-height:1.4">
-        Intro music is at <span style="color:var(--club-gold,#ffd54a)">20%</span> — talk about the game, then begin.
+        Intro music is at <span style="color:var(--club-gold,#ffd54a)">${introPct}%</span> — talk about the game, then begin.
       </p>
       <button class="btn-primary big-btn" style="margin-top:0.85rem" data-act="skip_intro">Begin questions</button>
+    </div>
+    <button class="btn-danger" data-act="reset_lobby">Reset to lobby</button>
+  `;
+}
+
+function renderPassBriefing() {
+  const active = activePlayers();
+  main.innerHTML = `
+    <div class="card">
+      <h2>Passes unlocked · 50%</h2>
+      <div class="host-script" style="margin:0.75rem 0;padding:0.85rem 1rem;border-radius:12px;background:rgba(255,213,74,0.1);border:1px solid rgba(255,213,74,0.4);font-weight:700;line-height:1.45">
+        <p style="margin:0 0 0.65rem">Script:</p>
+        <p style="margin:0 0 0.5rem">
+          “Everyone still in just earned a <span style="color:var(--club-gold,#ffd54a)">PASS</span>.”
+        </p>
+        <p style="margin:0 0 0.5rem">
+          “One free escape on a later question. Use it and you’re safe — but your $1,000 goes into the prize pot.”
+        </p>
+        <p style="margin:0">
+          “You can’t use it on the 1% question. Hold it or burn it wisely.”
+        </p>
+      </div>
+      <p class="muted">${active.length} players now have a pass · TV is on the pass hold</p>
+      <button class="btn-primary big-btn" style="margin-top:0.85rem" data-act="resolve_pass_briefing">
+        Continue to 50% question
+      </button>
     </div>
     <button class="btn-danger" data-act="reset_lobby">Reset to lobby</button>
   `;
@@ -441,6 +476,9 @@ function render() {
     case 'intro':
       renderIntro();
       break;
+    case 'pass_briefing':
+      renderPassBriefing();
+      break;
     case 'question':
     case 'answering':
       renderQuestion();
@@ -615,6 +653,15 @@ function render() {
   }
 }
 
+main.addEventListener('input', (e) => {
+  const t = e.target;
+  if (!(t instanceof HTMLElement)) return;
+  if (t.id === 'introVolInput') {
+    const label = document.getElementById('introVolLabel');
+    if (label) label.textContent = `${Math.round(Number(t.value || 0) * 100)}%`;
+  }
+});
+
 main.addEventListener('click', async (e) => {
   const t = e.target;
   if (!(t instanceof HTMLElement)) return;
@@ -625,6 +672,8 @@ main.addEventListener('click', async (e) => {
         questionFile: document.getElementById('packSelect')?.value,
         answerSeconds: Number(document.getElementById('secsInput')?.value || 30),
         masterVolume: Number(document.getElementById('volInput')?.value || 0.7),
+        introVolume: Number(document.getElementById('introVolInput')?.value || 0.2),
+        fastFinishWhenAllLocked: !!document.getElementById('fastFinish')?.checked,
         skipIntro: !!document.getElementById('skipIntro')?.checked,
       },
     });
