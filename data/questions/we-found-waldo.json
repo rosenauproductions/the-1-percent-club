@@ -1,0 +1,158 @@
+{
+  "name": "We Found Waldo",
+  "settings": {
+    "hidePrompt": true
+  },
+  "questions": [
+    {
+      "percent": 90,
+      "prompt": "Grandpa hid a safe in the house and told his grandkids they could find its location using the tools he left them. Where will they find grandpa’s safe?",
+      "answerType": "abcd",
+      "choices": ["Under the bed", "In the attic", "Closet", "Toolbox"],
+      "accepted": ["C", "Closet", "closet"],
+      "explanation": "Each tool looks like a letter and the safe is hidden in Grandpa's closet.",
+      "image": "90a.png",
+      "solutionImage": "90b.png"
+    },
+    {
+      "percent": 80,
+      "prompt": "Fork is the name of a person who’s related by blood to Knife but not to Spoon. Which 2 people could be identical twins with each other?",
+      "answerType": "abc",
+      "choices": ["Knife & Spoon", "Fork & Spoon", "Knife & Fork"],
+      "accepted": ["C", "Knife & Fork", "Knife and Fork", "knife and fork"],
+      "explanation": "Spoon cannot be an identical twin, because you cannot be related to one identical twin without being related to both.",
+      "image": "80a.png",
+      "solutionImage": "80b.png"
+    },
+    {
+      "percent": 70,
+      "prompt": "Follow the flowchart and do what it says.",
+      "answerType": "abcd",
+      "choices": ["That", "This", "Both", "Neither"],
+      "accepted": ["B", "This", "CHOOSE THIS", "choose this"],
+      "explanation": "If you follow the instructions correctly, you reach the box on the right which says \"CHOOSE THIS.\"",
+      "image": "70a.png",
+      "solutionImage": "70b.png"
+    },
+    {
+      "percent": 60,
+      "prompt": "There are no ifs, ands or buts in the sentence below. So, which is it missing more of — ifs, ands or buts?",
+      "answerType": "abc",
+      "choices": ["Ifs", "Ands", "Buts"],
+      "accepted": ["B", "Ands", "ands", "ANDS"],
+      "explanation": "There is one BUT, and two IFs, but three ANDs.",
+      "image": "60a.png",
+      "solutionImage": "60b.png"
+    },
+    {
+      "percent": 50,
+      "prompt": "Count the number of times all or part of Joel’s face appears in this picture.",
+      "answerType": "abcd",
+      "choices": ["19", "20", "21", "18"],
+      "accepted": ["B", "20", "twenty"],
+      "explanation": "There are 19 faces that are all the same size and 1 smaller one in the middle.",
+      "image": "50a.png",
+      "solutionImage": "50b.png"
+    },
+    {
+      "percent": 45,
+      "prompt": "This driver has been stopped by delivery robots crossing the street. Which of the 4 pics below shows the driver’s point of view?",
+      "answerType": "abcd",
+      "choices": ["A", "B", "C", "D"],
+      "accepted": ["C"],
+      "explanation": "It's the only one that shows each robot's flag in the correct order and orientation.",
+      "image": "45a.png",
+      "solutionImage": "45b.png"
+    },
+    {
+      "percent": 40,
+      "prompt": "How many total daughters are pictured in this family tree?",
+      "answerType": "abcd",
+      "choices": ["4", "5", "6", "8"],
+      "accepted": ["C", "6", "six"],
+      "explanation": "All six women and girls are daughters even if their parents aren't pictured.",
+      "image": "40a.png",
+      "solutionImage": "40b.png"
+    },
+    {
+      "percent": 35,
+      "prompt": "This strand of Christmas lights is missing a few bulbs! Based on its pattern, which color bulb is missing most from the part of the strand you see?",
+      "answerType": "abcd",
+      "choices": ["Red", "Yellow", "Green", "Blue"],
+      "accepted": ["D", "Blue", "blue"],
+      "explanation": "The second row is missing one yellow bulb and one green bulb. But the third row is missing two bulbs.",
+      "image": "35a.png",
+      "solutionImage": "35b.png"
+    },
+    {
+      "percent": 30,
+      "prompt": "Which artwork of the 4 below shows these pieces once they’ve been assembled?",
+      "answerType": "abcd",
+      "choices": ["A", "B", "C", "D"],
+      "accepted": ["D"],
+      "explanation": "Choice A has a smile that isn't in the original. B and C have extra triangles.",
+      "image": "30a.png",
+      "solutionImage": "30b.png"
+    },
+    {
+      "percent": 25,
+      "prompt": "To celebrate her husband’s birthday, Martha bought a 6pk of cupcakes. What’s the fewest # of cuts she’ll have to make in order for each family member to have an equal share of all these cupcakes?",
+      "answerType": "abcd",
+      "choices": ["1", "2", "3", "4"],
+      "accepted": ["B", "2", "two"],
+      "explanation": "If each family member takes one cupcake, there are two left over. Cut those in half and everyone has an equal number of cupcakes.",
+      "image": "25a.png",
+      "solutionImage": "25b.png"
+    },
+    {
+      "percent": 20,
+      "prompt": "If you shaded every word in this question green except for words that are colors of the rainbow like red and blue, how many words would be colored green?",
+      "answerType": "abcd",
+      "choices": ["25", "26", "29", "24"],
+      "accepted": ["A", "25", "twenty five", "twenty-five"],
+      "explanation": "There are 29 words total but four of them are colors, so 25 words would be shaded green.",
+      "image": "20a.png",
+      "solutionImage": "20b.png"
+    },
+    {
+      "percent": 15,
+      "prompt": "The newest chargers in your drawer wouldn’t be covered by any other cords — how many old chargers are there?",
+      "answerType": "abcd",
+      "choices": ["5", "6", "7", "8"],
+      "accepted": ["C", "7", "seven"],
+      "explanation": "There are 9 chargers, but 2 are new because they are uncovered. That means there are 7 old chargers in the drawer.",
+      "image": "15a.png",
+      "solutionImage": "15b.png"
+    },
+    {
+      "percent": 10,
+      "prompt": "What’s missing from this grid?",
+      "answerType": "abcd",
+      "choices": ["E", "F", "R", "O"],
+      "accepted": ["B", "F", "f"],
+      "explanation": "The question \"What’s missing from this grid?\" is written out backwards in this grid, starting in the bottom right-hand corner. The missing letter is the F from the word FROM.",
+      "image": "10a.png",
+      "solutionImage": "10b.png"
+    },
+    {
+      "percent": 5,
+      "prompt": "There’s a drawer containing 10 beads in 4 different amounts of 4 different colors. If there are twice as many red beads as white beads & twice as many white beads as blue beads, how many green beads are there?",
+      "answerType": "abcd",
+      "choices": ["1", "2", "3", "4"],
+      "accepted": ["C", "3", "three"],
+      "explanation": "The only way for there to be four different amounts that add up to 10 is 1+2+3+4. And 3 is the only number that can't be twice or half of any of the other ones.",
+      "image": "5a.png",
+      "solutionImage": "5b.png"
+    },
+    {
+      "percent": 1,
+      "prompt": "What 4-digit number replaces the question mark in this image?",
+      "answerType": "abcd",
+      "choices": ["1022", "1113", "2111", "1311"],
+      "accepted": ["B", "1113"],
+      "explanation": "The digits represent the number of red, blue, green, and yellow shapes in each group. The 4th group is made up of one red, one blue, one green, and three yellows.",
+      "image": "1a.png",
+      "solutionImage": "1b.png"
+    }
+  ]
+}
