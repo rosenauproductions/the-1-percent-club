@@ -54,7 +54,6 @@
       <a class="card" href="/display/"><strong>TV DISPLAY</strong><span>Loading…</span></a>
       <a class="card" href="/host/"><strong>HOST</strong><span>Loading…</span></a>
       <a class="card" href="/play/"><strong>PLAY</strong><span>Loading…</span></a>
-      <a class="card" href="/qa/"><strong>QA BOARD</strong><span>Feedback</span></a>
     </div>
     <p class="meta" id="meta">Checking server…</p>
   </div>
@@ -64,7 +63,6 @@
       <a class="card" href="${base}/display/"><strong>TV DISPLAY</strong><span>${base}/display/</span></a>
       <a class="card" href="${base}/host/"><strong>HOST</strong><span>${base}/host/</span></a>
       <a class="card" href="${base}/play/"><strong>PLAY</strong><span>${base}/play/</span></a>
-      <a class="card" href="${base}/qa/"><strong>QA BOARD</strong><span>${base}/qa/</span></a>
     `;
     try {
       await fetch('/api/info').then((r) => r.json());
