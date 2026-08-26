@@ -498,12 +498,20 @@ app.get('/api/question-files', async (_req, res) => {
   }
 });
 
-/** Pack metadata (name + settings) for host setup seeding. */
+/** Pack metadata (name + settings) for host setup seeding. Optional preview=1 includes questions. */
 app.get('/api/question-pack', async (req, res) => {
   try {
     const file = String(req.query.file || '');
     const pack = await loadQuestionPack(file);
-    res.json({ name: pack.name, settings: pack.settings });
+    const body = { name: pack.name, settings: pack.settings, packId: pack.packId };
+    const preview =
+      req.query.preview === '1' ||
+      req.query.preview === 'true' ||
+      req.query.include === 'questions';
+    if (preview) {
+      body.questions = pack.questions;
+    }
+    res.json(body);
   } catch (err) {
     res.status(400).json({ error: err.message });
   }

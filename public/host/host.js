@@ -13,6 +13,19 @@ const jackpotEl = document.getElementById('jackpot');
 let state = null;
 let questionFiles = [];
 
+/** Local host-only pack preview (does not broadcast / advance live game). */
+let packPreview = {
+  open: false,
+  file: null,
+  name: null,
+  questions: [],
+  index: 0,
+  loading: false,
+  error: null,
+  /** 'both' | 'question' | 'solution' */
+  imageMode: 'both',
+};
+
 /** Secret test mode: /host?test=1 or tap HOST title 5× */
 const params = new URLSearchParams(location.search);
 let testMode = params.get('test') === '1' || params.get('test') === 'true';
@@ -88,6 +101,193 @@ async function loadPacks() {
   } catch {
     questionFiles = ['split-decision.json'];
   }
+}
+
+function selectedPackFile() {
+  return (
+    document.getElementById('packSelect')?.value ||
+    state?.setup?.questionFile ||
+    questionFiles[0] ||
+    ''
+  );
+}
+
+function resetPackPreview() {
+  packPreview = {
+    open: false,
+    file: null,
+    name: null,
+    questions: [],
+    index: 0,
+    loading: false,
+    error: null,
+    imageMode: packPreview.imageMode || 'both',
+  };
+}
+
+async function loadPackPreview(file, { open = true } = {}) {
+  if (!file) return;
+  packPreview = {
+    ...packPreview,
+    open,
+    file,
+    loading: true,
+    error: null,
+  };
+  if (state?.phase === 'lobby') render();
+  try {
+    const res = await fetch(
+      `/api/question-pack?file=${encodeURIComponent(file)}&preview=1`,
+    );
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Could not load pack');
+    const questions = Array.isArray(data.questions) ? data.questions : [];
+    packPreview = {
+      ...packPreview,
+      open,
+      file,
+      name: data.name || file,
+      questions,
+      index: questions.length
+        ? Math.min(Math.max(0, packPreview.index), questions.length - 1)
+        : 0,
+      loading: false,
+      error: questions.length ? null : 'This pack has no questions.',
+    };
+  } catch (err) {
+    packPreview = {
+      ...packPreview,
+      open,
+      file,
+      questions: [],
+      loading: false,
+      error: err.message || 'Could not load pack',
+    };
+  }
+  if (state?.phase === 'lobby') render();
+}
+
+function previewImageHtml(src, label) {
+  if (!src) {
+    return `<div class="preview-img-empty muted">${escapeHtml(label)} — no image</div>`;
+  }
+  return `<figure class="preview-img">
+    <figcaption class="muted">${escapeHtml(label)}</figcaption>
+    <img src="${escapeHtml(src)}" alt="" loading="lazy" data-preview-fallback="${escapeHtml(label)}" />
+  </figure>`;
+}
+
+function renderPackPreviewCard() {
+  const file = packPreview.open
+    ? packPreview.file || selectedPackFile()
+    : selectedPackFile();
+  const { open, loading, error, questions, index, imageMode, name } = packPreview;
+
+  if (!open) {
+    return `
+      <div class="card" id="packPreviewCard">
+        <h2>Preview pack</h2>
+        <p class="muted" style="margin:0 0 0.65rem">
+          Step through all questions &amp; answers for the selected pack — host only, does not start the game or change the TV.
+        </p>
+        <button type="button" class="btn-ghost" id="openPackPreview" ${file ? '' : 'disabled'}>
+          Preview questions
+        </button>
+      </div>`;
+  }
+
+  const safeIndex =
+    questions.length > 0
+      ? Math.min(Math.max(0, index), questions.length - 1)
+      : 0;
+  const q = !loading && !error && questions.length ? questions[safeIndex] : null;
+  const total = questions.length;
+  const letters = 'ABCDEF'.split('');
+  const choices = Array.isArray(q?.choices) ? q.choices : [];
+  const accepted = Array.isArray(q?.accepted) ? q.accepted : [];
+  const answerType = q?.answerType || q?.input || q?.mode || 'text';
+
+  let body = '';
+  if (loading) {
+    body = `<p class="muted">Loading ${escapeHtml(file || 'pack')}…</p>`;
+  } else if (error) {
+    body = `<p class="muted" style="color:var(--club-danger,#ff8a96)">${escapeHtml(error)}</p>`;
+  } else if (!q) {
+    body = `<p class="muted">No questions in this pack.</p>`;
+  } else {
+    const choicesHtml = choices.length
+      ? `<ul class="preview-choices">
+          ${choices
+            .map(
+              (c, i) =>
+                `<li><span class="preview-letter">${letters[i] || i + 1}</span> ${escapeHtml(c)}</li>`,
+            )
+            .join('')}
+        </ul>`
+      : `<p class="muted" style="margin:0">No labeled choices (letter / free-text mode).</p>`;
+
+    const imagesHtml =
+      imageMode === 'question'
+        ? previewImageHtml(q.image, 'Question')
+        : imageMode === 'solution'
+          ? previewImageHtml(q.solutionImage, 'Solution')
+          : `<div class="preview-imgs">
+              ${previewImageHtml(q.image, 'Question')}
+              ${previewImageHtml(q.solutionImage, 'Solution')}
+            </div>`;
+
+    body = `
+      <div class="preview-nav row">
+        <button type="button" class="btn-ghost" id="previewPrev" ${safeIndex <= 0 ? 'disabled' : ''}>Prev</button>
+        <div class="preview-pos muted">${safeIndex + 1} / ${total}</div>
+        <button type="button" class="btn-ghost" id="previewNext" ${safeIndex >= total - 1 ? 'disabled' : ''}>Next</button>
+      </div>
+      <div class="preview-q">
+        <div class="preview-meta">
+          <span class="badge">${escapeHtml(String(q.percent ?? '—'))}%</span>
+          <span class="muted">Type: <strong>${escapeHtml(String(answerType))}</strong></span>
+        </div>
+        <p class="preview-prompt">${escapeHtml(q.prompt || '(no prompt)')}</p>
+        <div class="preview-block">
+          <div class="muted preview-label">Choices</div>
+          ${choicesHtml}
+        </div>
+        <div class="preview-block">
+          <div class="muted preview-label">Accepted answers</div>
+          <p class="preview-accepted">${
+            accepted.length
+              ? accepted.map(escapeHtml).join(' · ')
+              : '<span class="muted">None listed</span>'
+          }</p>
+        </div>
+        <div class="preview-block">
+          <div class="muted preview-label">Explanation</div>
+          <p class="preview-explanation">${
+            q.explanation
+              ? escapeHtml(q.explanation)
+              : '<span class="muted">No explanation</span>'
+          }</p>
+        </div>
+        <div class="preview-block">
+          <div class="row preview-img-toggle">
+            <button type="button" class="btn-ghost ${imageMode === 'both' ? 'is-active' : ''}" data-preview-img="both">Both</button>
+            <button type="button" class="btn-ghost ${imageMode === 'question' ? 'is-active' : ''}" data-preview-img="question">Question</button>
+            <button type="button" class="btn-ghost ${imageMode === 'solution' ? 'is-active' : ''}" data-preview-img="solution">Solution</button>
+          </div>
+          ${imagesHtml}
+        </div>
+      </div>`;
+  }
+
+  return `
+    <div class="card" id="packPreviewCard">
+      <h2>Preview pack</h2>
+      <p class="muted" style="margin:0 0 0.65rem">
+        ${escapeHtml(name || file || 'Pack')} · host only — does not affect the live game or TV.
+      </p>
+      ${body}
+      <button type="button" class="btn-ghost" id="closePackPreview" style="margin-top:0.65rem">Close preview</button>
+    </div>`;
 }
 
 function lockedCount() {
@@ -229,6 +429,7 @@ function renderLobby() {
         <button class="btn-primary big-btn" data-act="start_game" ${players.length ? '' : 'disabled'}>Start game</button>
       </div>
     </div>
+    ${renderPackPreviewCard()}
   `;
 }
 
@@ -749,6 +950,12 @@ main.addEventListener('change', async (e) => {
   if (t.id !== 'packSelect') return;
   const file = t.value;
   if (!file) return;
+  if (packPreview.open) {
+    packPreview.index = 0;
+    await loadPackPreview(file, { open: true });
+  } else if (packPreview.file && packPreview.file !== file) {
+    resetPackPreview();
+  }
   try {
     const res = await fetch(`/api/question-pack?file=${encodeURIComponent(file)}`);
     if (!res.ok) return;
@@ -763,9 +970,61 @@ main.addEventListener('change', async (e) => {
   }
 });
 
+main.addEventListener(
+  'error',
+  (e) => {
+    const img = e.target;
+    if (!(img instanceof HTMLImageElement)) return;
+    const label = img.getAttribute('data-preview-fallback');
+    if (!label) return;
+    const empty = document.createElement('div');
+    empty.className = 'preview-img-empty muted';
+    empty.textContent = `${label} — missing`;
+    img.replaceWith(empty);
+  },
+  true,
+);
+
 main.addEventListener('click', async (e) => {
   const t = e.target;
   if (!(t instanceof HTMLElement)) return;
+
+  if (t.id === 'openPackPreview') {
+    const file = selectedPackFile();
+    if (!file) return;
+    packPreview.index = 0;
+    await loadPackPreview(file, { open: true });
+    return;
+  }
+
+  if (t.id === 'closePackPreview') {
+    packPreview.open = false;
+    if (state?.phase === 'lobby') render();
+    return;
+  }
+
+  if (t.id === 'previewPrev') {
+    if (packPreview.index > 0) {
+      packPreview.index -= 1;
+      if (state?.phase === 'lobby') render();
+    }
+    return;
+  }
+
+  if (t.id === 'previewNext') {
+    if (packPreview.index < packPreview.questions.length - 1) {
+      packPreview.index += 1;
+      if (state?.phase === 'lobby') render();
+    }
+    return;
+  }
+
+  const imgMode = t.getAttribute('data-preview-img');
+  if (imgMode === 'both' || imgMode === 'question' || imgMode === 'solution') {
+    packPreview.imageMode = imgMode;
+    if (state?.phase === 'lobby') render();
+    return;
+  }
 
   if (t.id === 'saveSetup') {
     if (Date.now() < setupSavedUntil) return;
