@@ -352,6 +352,9 @@ function activePlayers(state) {
   return state.players.filter((p) => p.status === 'active');
 }
 
+/** No heartbeat for this long → host treats player as offline. */
+export const PRESENCE_STALE_MS = 40000;
+
 function publicPlayers(players) {
   return players.map((p) => ({
     id: p.id,
@@ -361,7 +364,51 @@ function publicPlayers(players) {
     usedPass: p.usedPass,
     seat: p.seat,
     winnings: p.winnings,
+    connected: !!p.connected,
+    lastSeen: p.lastSeen || 0,
   }));
+}
+
+/** Mark player online / refresh lastSeen. Returns { state, changed } (changed = connected flipped on). */
+export function touchPlayerPresence(state, playerId) {
+  if (!playerId) return { state, changed: false };
+  const now = Date.now();
+  let found = false;
+  let changed = false;
+  const players = state.players.map((p) => {
+    if (p.id !== playerId) return p;
+    found = true;
+    if (!p.connected) changed = true;
+    return { ...p, connected: true, lastSeen: now };
+  });
+  if (!found) return { state, changed: false };
+  return { state: { ...state, players }, changed };
+}
+
+/** Mark player offline (keep on roster). */
+export function markPlayerOffline(state, playerId) {
+  if (!playerId) return { state, changed: false };
+  let changed = false;
+  const players = state.players.map((p) => {
+    if (p.id !== playerId) return p;
+    if (!p.connected) return p;
+    changed = true;
+    return { ...p, connected: false };
+  });
+  return { state: { ...state, players }, changed };
+}
+
+/** Flip connected→false when lastSeen is older than staleMs. */
+export function sweepStalePresence(state, staleMs = PRESENCE_STALE_MS) {
+  const now = Date.now();
+  let changed = false;
+  const players = state.players.map((p) => {
+    if (!p.connected || p.testBot) return p;
+    if (p.lastSeen && now - p.lastSeen < staleMs) return p;
+    changed = true;
+    return { ...p, connected: false };
+  });
+  return changed ? { ...state, players } : state;
 }
 
 export function sanitizeStateForClient(state, role, playerId = null) {
@@ -511,11 +558,15 @@ export function joinPlayer(state, { name, playerId }) {
   const clean = String(name ?? '').trim().slice(0, 18);
   if (clean.length < 1) throw new Error('Name required');
 
+  const now = Date.now();
+
   if (playerId) {
     const existing = state.players.find((p) => p.id === playerId);
     if (existing) {
       const players = state.players.map((p) =>
-        p.id === playerId ? { ...p, name: clean } : p,
+        p.id === playerId
+          ? { ...p, name: clean, connected: true, lastSeen: now }
+          : p,
       );
       const player = players.find((p) => p.id === playerId);
       return { state: { ...state, players }, player };
@@ -536,6 +587,8 @@ export function joinPlayer(state, { name, playerId }) {
     seat: state.players.length,
     winnings: 0,
     stakeInJackpot: false,
+    connected: true,
+    lastSeen: now,
   };
 
   return {
@@ -562,7 +615,9 @@ export function seedTestPlayers(state) {
     next = {
       ...result.state,
       players: result.state.players.map((p) =>
-        p.id === result.player.id ? { ...p, testBot: true } : p,
+        p.id === result.player.id
+          ? { ...p, testBot: true, connected: true, lastSeen: Date.now() }
+          : p,
       ),
     };
   }

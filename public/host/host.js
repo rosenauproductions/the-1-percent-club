@@ -62,6 +62,27 @@ function escapeHtml(s) {
     .replace(/>/g, '&gt;');
 }
 
+function playerOnline(p) {
+  return !!p?.connected;
+}
+
+function presenceMark(p) {
+  const player =
+    p && p.connected === undefined && p.playerId
+      ? state.players?.find((x) => x.id === p.playerId) || p
+      : p;
+  const on = playerOnline(player);
+  return `<span class="presence ${on ? 'presence--on' : 'presence--off'}" title="${
+    on ? 'Online' : 'Offline'
+  }" aria-label="${on ? 'online' : 'offline'}">${on ? '●' : '○'}</span>`;
+}
+
+function onlineSummary(players = state?.players || []) {
+  const total = players.length;
+  const n = players.filter(playerOnline).length;
+  return `${n}/${total} online`;
+}
+
 const HOST_SNARK = [
   'Let’s put all the ugliness behind us… and focus on the ugliness ahead.',
   'Congratulations to everyone who just donated their stake to the smarter people.',
@@ -338,7 +359,7 @@ function liveAnswerRowsHtml() {
             ? ' · forced ✗'
             : '';
       return `<li>
-        <div class="name">${escapeHtml(p.name)}${escapeHtml(forced)}</div>
+        <div class="name">${presenceMark(p)} ${escapeHtml(p.name)}${escapeHtml(forced)}</div>
         <div class="text">${
           a?.locked ? (a.usedPass ? '(PASS)' : escapeHtml(a.text || '—')) : '…thinking'
         }</div>
@@ -373,7 +394,7 @@ function renderLobby() {
   main.innerHTML = `
     <div class="card">
       <h2>Lobby · Code ${escapeHtml(state.joinCode)}</h2>
-      <p class="muted">${players.length} joined · ${state.lobbyOpen ? 'open' : 'closed'} · Display ${state.displayConnected ? '✓' : '✗'}</p>
+      <p class="muted">${players.length} joined · ${onlineSummary(players)} · ${state.lobbyOpen ? 'open' : 'closed'} · Display ${state.displayConnected ? '✓' : '✗'}</p>
       <div class="stack" style="margin-top:0.75rem">
         <div class="row">
           <button class="btn-ghost" data-act="close_lobby" ${state.lobbyOpen ? '' : 'disabled'}>Close join</button>
@@ -382,7 +403,7 @@ function renderLobby() {
         <ul class="player-list">
           ${players
             .map(
-              (p) => `<li><span>${escapeHtml(p.name)}</span>
+              (p) => `<li><span class="player-list__name">${presenceMark(p)} ${escapeHtml(p.name)}</span>
                 <button class="btn-danger" data-remove="${p.id}">Remove</button></li>`,
             )
             .join('') || '<li class="muted">Waiting for players…</li>'}
@@ -569,15 +590,15 @@ function renderQuestion() {
     </div>
     ${
       answering
-        ? `<div class="card"><h2>Live answers · umpire</h2>
+        ? `<div class="card"><h2>Live answers · umpire · ${onlineSummary(active)}</h2>
             <p class="muted" style="margin:0 0 0.65rem">You see every lock. Mark correct if the server is being picky.</p>
             <ul class="answer-list" id="hostLiveAnswers">
               ${liveAnswerRowsHtml()}
             </ul></div>`
-        : `<div class="card"><h2>Still in</h2>
+        : `<div class="card"><h2>Still in · ${onlineSummary(active)}</h2>
             <ul class="answer-list">
               ${active
-                .map((p) => `<li><div class="name">${escapeHtml(p.name)}</div></li>`)
+                .map((p) => `<li><div class="name">${presenceMark(p)} ${escapeHtml(p.name)}</div></li>`)
                 .join('') || '<li><div class="text">Nobody left</div></li>'}
             </ul></div>`
     }
@@ -618,7 +639,7 @@ function renderRoastLists() {
               ${wrongs
                 .map(
                   (row) => `<li class="roast-item">
-                    <div class="name bad">${escapeHtml(row.name)}</div>
+                    <div class="name bad">${presenceMark(row)} ${escapeHtml(row.name)}</div>
                     <div class="roast-answer">${
                       row.timedOut || !row.text
                         ? '<em>(no answer)</em>'
@@ -646,7 +667,7 @@ function renderRoastLists() {
               ${safes
                 .map(
                   (row) => `<li>
-                    <div class="name ok">${escapeHtml(row.name)} ✓</div>
+                    <div class="name ok">${presenceMark(row)} ${escapeHtml(row.name)} ✓</div>
                     <div class="text">${escapeHtml(row.text || '—')}</div>
                     ${
                       canUmpire && !row.usedPass
@@ -783,7 +804,7 @@ function renderFinale() {
 function render() {
   if (!state) return;
   jackpotEl.textContent = money(state.jackpot);
-  statusLine.textContent = `Phase: ${state.phase} · Players ${state.players?.length || 0} · TV ${state.displayConnected ? '✓' : '✗'}`;
+  statusLine.textContent = `Phase: ${state.phase} · ${onlineSummary()} · TV ${state.displayConnected ? '✓' : '✗'}`;
 
   switch (state.phase) {
     case 'lobby':
@@ -1165,7 +1186,7 @@ function onState(next) {
   if (next.phase === 'answering') {
     tick = setInterval(() => {
       jackpotEl.textContent = money(state.jackpot);
-      statusLine.textContent = `Phase: ${state.phase} · Players ${state.players?.length || 0} · TV ${state.displayConnected ? '✓' : '✗'}`;
+      statusLine.textContent = `Phase: ${state.phase} · ${onlineSummary()} · TV ${state.displayConnected ? '✓' : '✗'}`;
       if (!updateAnsweringOnly()) render();
     }, 250);
   }

@@ -1,4 +1,13 @@
-import { connect, sendAction, sendActionWithRetry, setPlayerId, ensureConnected } from '../shared/ws.js';
+import {
+  connect,
+  sendAction,
+  sendActionWithRetry,
+  setPlayerId,
+  ensureConnected,
+  sendPing,
+  onWsOpen,
+  onWsPong,
+} from '../shared/ws.js?v=presence1';
 import { installErrorHandlers, mountQaWidget, showBoot, hideBoot } from '../shared/boot.js';
 import {
   playSoundTimes,
@@ -16,6 +25,7 @@ showBoot('Connecting to server…');
 
 const STORAGE_KEY = 'club_player_v1';
 const VOLUME_KEY = 'club_volume_ok_v1';
+const HEARTBEAT_MS = 18000;
 const main = document.getElementById('main');
 const meta = document.getElementById('meta');
 
@@ -31,6 +41,11 @@ let lastPlaySoundAt = null;
 let volumeReady = false;
 /** 'ask' = play sound · 'confirm' = did you hear it? */
 let volumeGateStep = 'ask';
+let wakeLock = null;
+let heartbeatTimer = null;
+let connectedFlashTimer = null;
+/** When true, next pong shows a brief “Connected” confirmation. */
+let expectConnectedFlash = false;
 
 const params = new URLSearchParams(location.search);
 const presetCode = (params.get('code') || '').toUpperCase();
@@ -85,6 +100,7 @@ async function act(action, payload = {}, { retry = false } = {}) {
       saveIdentity();
       // reconnect with player id for filtered state
       connect('player', onState, { playerId });
+      syncHeartbeat();
     }
     joinError = '';
     return data;
@@ -92,6 +108,108 @@ async function act(action, payload = {}, { retry = false } = {}) {
     joinError = err.message;
     render();
     throw err;
+  }
+}
+
+/** Hold screen wake lock while seated in a live game (not pre-join lobby / game end). */
+function shouldHoldWakeLock() {
+  if (!playerId || !state) return false;
+  const p = me();
+  if (!p) return false;
+  if (state.phase === 'game_end') return false;
+  return true;
+}
+
+async function requestWakeLock() {
+  try {
+    if (!('wakeLock' in navigator)) return;
+    if (document.visibilityState !== 'visible') return;
+    if (wakeLock) return;
+    wakeLock = await navigator.wakeLock.request('screen');
+    wakeLock.addEventListener('release', () => {
+      wakeLock = null;
+    });
+  } catch {
+    // unsupported / permission denied — fail soft
+  }
+}
+
+function releaseWakeLock() {
+  const lock = wakeLock;
+  wakeLock = null;
+  if (!lock) return;
+  try {
+    lock.release();
+  } catch {
+    // ignore
+  }
+}
+
+function syncWakeLock() {
+  if (shouldHoldWakeLock()) requestWakeLock();
+  else releaseWakeLock();
+}
+
+function stopHeartbeat() {
+  if (heartbeatTimer) {
+    clearInterval(heartbeatTimer);
+    heartbeatTimer = null;
+  }
+}
+
+function syncHeartbeat() {
+  if (!playerId) {
+    stopHeartbeat();
+    return;
+  }
+  if (heartbeatTimer) return;
+  heartbeatTimer = setInterval(() => {
+    if (playerId) sendPing();
+  }, HEARTBEAT_MS);
+}
+
+/** Ensure WS + immediate presence ping (resume / Still here). */
+function beatNow({ flash = false } = {}) {
+  if (flash) {
+    expectConnectedFlash = true;
+    setTimeout(() => {
+      expectConnectedFlash = false;
+    }, 5000);
+  }
+  ensureConnected();
+  syncWakeLock();
+}
+
+function showConnectedFlash() {
+  let el = document.getElementById('presenceFlash');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'presenceFlash';
+    el.className = 'presence-flash';
+    el.setAttribute('role', 'status');
+    document.body.appendChild(el);
+  }
+  el.textContent = 'Connected';
+  el.classList.add('is-visible');
+  if (connectedFlashTimer) clearTimeout(connectedFlashTimer);
+  connectedFlashTimer = setTimeout(() => {
+    el.classList.remove('is-visible');
+  }, 1600);
+}
+
+function renderPresenceControls() {
+  const show = !!playerId && !!me();
+  let bar = document.getElementById('presenceBar');
+  if (!show) {
+    bar?.remove();
+    return;
+  }
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.id = 'presenceBar';
+    bar.className = 'presence-bar';
+    bar.innerHTML = `<button type="button" class="btn-ghost presence-bar__btn" id="stillHereBtn">Still here</button>`;
+    document.body.appendChild(bar);
   }
 }
 
@@ -549,7 +667,10 @@ function render() {
       ? `Code ${state.joinCode}`
       : 'Not seated';
 
+  renderPresenceControls();
+
   if (!p) {
+    releaseWakeLock();
     if (state?.phase === 'lobby') renderJoin();
     else {
       main.innerHTML = `<div class="hero"><h1>Game in progress</h1><p class="muted">Wait for the next lobby</p></div>`;
@@ -986,6 +1107,8 @@ function onState(next) {
   syncEliminationUi(p);
   handlePlayerSoundCue(next.soundCue);
   maybePlayOutSound(p);
+  syncWakeLock();
+  syncHeartbeat();
   render();
   if (tick) clearInterval(tick);
   if (state.phase === 'answering') tick = setInterval(updateTimerOnly, 200);
@@ -993,6 +1116,37 @@ function onState(next) {
 
 loadIdentity();
 connect('player', onState, { playerId });
+syncHeartbeat();
+
+onWsOpen(() => {
+  if (playerId) sendPing();
+});
+
+onWsPong(() => {
+  if (expectConnectedFlash) {
+    expectConnectedFlash = false;
+    showConnectedFlash();
+  }
+});
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    beatNow();
+  }
+});
+
+window.addEventListener('online', () => {
+  beatNow();
+});
+
+document.addEventListener('click', (e) => {
+  const t = e.target;
+  if (!(t instanceof Element)) return;
+  if (t.id === 'stillHereBtn' || t.closest('#stillHereBtn')) {
+    e.preventDefault();
+    beatNow({ flash: true });
+  }
+});
 
 setTimeout(() => {
   if (!state) {

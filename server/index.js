@@ -45,6 +45,10 @@ import {
   lockedCount,
   createJoinCode,
   thumpGapMs,
+  touchPlayerPresence,
+  markPlayerOffline,
+  sweepStalePresence,
+  PRESENCE_STALE_MS,
 } from './gameState.js';
 import { MDNS_NAME, networkInfo } from './network.js';
 import { Bonjour } from 'bonjour-service';
@@ -213,6 +217,25 @@ function updateConnectionFlags() {
     hostConnected: [...clients].some((c) => c.role === 'host'),
     playerConnections: [...clients].filter((c) => c.role === 'player').length,
   };
+}
+
+/** Refresh presence for a player socket; broadcast only when connected flips on. */
+function notePlayerSeen(playerId) {
+  if (!playerId) return false;
+  const result = touchPlayerPresence(state, playerId);
+  state = result.state;
+  return result.changed;
+}
+
+function notePlayerGone(playerId, closingWs) {
+  if (!playerId) return false;
+  const stillConnected = [...clients].some(
+    (c) => c !== closingWs && c.role === 'player' && c.playerId === playerId,
+  );
+  if (stillConnected) return false;
+  const result = markPlayerOffline(state, playerId);
+  state = result.state;
+  return result.changed;
 }
 
 async function loadQuestionPack(filename) {
@@ -629,6 +652,9 @@ wss.on('connection', (ws, req) => {
   ws.playerId = url.searchParams.get('playerId') || null;
   clients.add(ws);
   updateConnectionFlags();
+  if (ws.role === 'player' && ws.playerId) {
+    notePlayerSeen(ws.playerId);
+  }
   ws.send(JSON.stringify({ type: 'state', state: clientView(ws) }));
   broadcast();
 
@@ -640,10 +666,26 @@ wss.on('connection', (ws, req) => {
         updateConnectionFlags();
         broadcast();
       } else if (msg.type === 'ping') {
-        ws.send(JSON.stringify({ type: 'pong' }));
+        if (ws.role === 'player') {
+          if (msg.playerId) ws.playerId = msg.playerId;
+          const flipped = notePlayerSeen(ws.playerId);
+          ws.send(JSON.stringify({ type: 'pong', at: Date.now() }));
+          if (flipped) {
+            updateConnectionFlags();
+            broadcast();
+          }
+        } else {
+          ws.send(JSON.stringify({ type: 'pong', at: Date.now() }));
+        }
       } else if (msg.type === 'identify') {
         ws.playerId = msg.playerId || ws.playerId;
+        const flipped =
+          ws.role === 'player' && ws.playerId ? notePlayerSeen(ws.playerId) : false;
         ws.send(JSON.stringify({ type: 'state', state: clientView(ws) }));
+        if (flipped) {
+          updateConnectionFlags();
+          broadcast();
+        }
       }
     } catch (err) {
       ws.send(JSON.stringify({ type: 'error', error: err.message }));
@@ -652,10 +694,23 @@ wss.on('connection', (ws, req) => {
 
   ws.on('close', () => {
     clients.delete(ws);
+    if (ws.role === 'player' && ws.playerId) {
+      notePlayerGone(ws.playerId, ws);
+    }
     updateConnectionFlags();
     broadcast();
   });
 });
+
+// Mark players offline if heartbeats stop (WS may stay half-open on phones).
+setInterval(() => {
+  const next = sweepStalePresence(state, PRESENCE_STALE_MS);
+  if (next !== state) {
+    state = next;
+    updateConnectionFlags();
+    broadcast();
+  }
+}, 10000);
 
 server.listen(PORT, '0.0.0.0', async () => {
   const info = networkInfo(PORT);

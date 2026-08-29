@@ -3,6 +3,8 @@ let role = 'display';
 let playerId = null;
 let onState = () => {};
 let reconnectTimer = null;
+const openListeners = new Set();
+const pongListeners = new Set();
 
 export function connect(clientRole, stateCallback, opts = {}) {
   role = clientRole;
@@ -29,12 +31,46 @@ export function setPlayerId(id) {
   playerId = id;
 }
 
-/** Re-open the WS if it dropped (state sync). Actions still go over HTTP. */
-export function ensureConnected() {
-  if (socket?.readyState === WebSocket.OPEN || socket?.readyState === WebSocket.CONNECTING) {
-    return;
+export function isSocketOpen() {
+  return socket?.readyState === WebSocket.OPEN;
+}
+
+/** Subscribe to WS open (reconnect included). Returns unsubscribe. */
+export function onWsOpen(fn) {
+  openListeners.add(fn);
+  return () => openListeners.delete(fn);
+}
+
+/** Subscribe to server pong replies. Returns unsubscribe. */
+export function onWsPong(fn) {
+  pongListeners.add(fn);
+  return () => pongListeners.delete(fn);
+}
+
+/** Send a presence ping if the socket is open. */
+export function sendPing() {
+  if (socket?.readyState !== WebSocket.OPEN) return false;
+  try {
+    socket.send(JSON.stringify({ type: 'ping', playerId: playerId || undefined }));
+    return true;
+  } catch {
+    return false;
   }
+}
+
+/**
+ * Re-open the WS if it dropped (state sync). Actions still go over HTTP.
+ * When already open as a player, sends an immediate presence ping.
+ * @returns {boolean} true if already OPEN
+ */
+export function ensureConnected() {
+  if (socket?.readyState === WebSocket.OPEN) {
+    if (role === 'player' && playerId) sendPing();
+    return true;
+  }
+  if (socket?.readyState === WebSocket.CONNECTING) return false;
   openSocket();
+  return false;
 }
 
 async function fetchInitialState() {
@@ -64,8 +100,29 @@ function wsUrl() {
   return url;
 }
 
+function notifyOpen() {
+  for (const fn of openListeners) {
+    try {
+      fn();
+    } catch {
+      // ignore listener errors
+    }
+  }
+}
+
+function notifyPong(msg) {
+  for (const fn of pongListeners) {
+    try {
+      fn(msg);
+    } catch {
+      // ignore listener errors
+    }
+  }
+}
+
 function openSocket() {
   if (socket?.readyState === WebSocket.OPEN) return;
+  if (socket?.readyState === WebSocket.CONNECTING) return;
 
   try {
     socket = new WebSocket(wsUrl());
@@ -79,11 +136,23 @@ function openSocket() {
       clearTimeout(reconnectTimer);
       reconnectTimer = null;
     }
+    if (playerId && role === 'player') {
+      try {
+        socket.send(JSON.stringify({ type: 'identify', playerId }));
+      } catch {
+        // ignore
+      }
+    }
+    notifyOpen();
   });
 
   socket.addEventListener('message', (event) => {
     try {
       const msg = JSON.parse(event.data);
+      if (msg.type === 'pong') {
+        notifyPong(msg);
+        return;
+      }
       if (msg.type === 'state') onState(msg.state);
     } catch {
       // ignore bad frames

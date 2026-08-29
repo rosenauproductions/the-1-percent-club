@@ -120,6 +120,33 @@ label.field input {
   font-size: 0.75rem;
 }
 
+.player-list__name {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.presence {
+  display: inline-block;
+  font-size: 0.7rem;
+  line-height: 1;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+
+.presence--on {
+  color: #5dffa0;
+}
+
+.presence--off {
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.answer-list .name .presence {
+  margin-right: 0.15rem;
+}
+
 .answer-list {
   list-style: none;
   margin: 0;

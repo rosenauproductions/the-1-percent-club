@@ -564,3 +564,43 @@ body.elim-searching .play-header {
     transform: translateX(-50%) scale(1);
   }
 }
+
+.presence-bar {
+  position: fixed;
+  right: max(0.75rem, env(safe-area-inset-right));
+  bottom: max(0.75rem, env(safe-area-inset-bottom));
+  z-index: 20;
+}
+
+.presence-bar__btn {
+  font-size: 0.8rem;
+  padding: 0.45rem 0.75rem;
+  opacity: 0.85;
+  background: rgba(5, 11, 26, 0.85);
+  border: 1px solid rgba(46, 230, 255, 0.28);
+  color: var(--text-muted);
+}
+
+.presence-flash {
+  position: fixed;
+  left: 50%;
+  bottom: max(4.5rem, calc(env(safe-area-inset-bottom) + 3.5rem));
+  transform: translateX(-50%) translateY(8px);
+  z-index: 30;
+  padding: 0.45rem 0.9rem;
+  border-radius: 999px;
+  background: rgba(8, 40, 28, 0.92);
+  border: 1px solid rgba(80, 220, 140, 0.45);
+  color: #b8f5d0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.presence-flash.is-visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
