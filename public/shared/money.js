@@ -1,7 +1,6 @@
 /** @typedef {'points' | 'dollars' | 'custom'} Currency */
 
 export const DEFAULT_MAX_JACKPOT = 100;
-export const DEFAULT_EXPECTED_PLAYERS = 25;
 export const DEFAULT_CURRENCY_LABEL = 'Gold Bars';
 /** Classic show stake before max-jackpot scaling. */
 export const CLASSIC_STAKE = 1000;
@@ -36,17 +35,6 @@ export function normalizeMaxJackpot(value) {
 }
 
 /**
- * Planning player count for stake preview (host setup).
- * @param {unknown} value
- * @returns {number}
- */
-export function normalizeExpectedPlayers(value) {
-  const n = Math.round(Number(value));
-  if (!Number.isFinite(n) || n < 1) return DEFAULT_EXPECTED_PLAYERS;
-  return Math.min(100, n);
-}
-
-/**
  * Per-player stake: floor(maxJackpot / playerCount), at least 1.
  * @param {unknown} maxJackpot
  * @param {unknown} playerCount
@@ -59,24 +47,16 @@ export function computeStake(maxJackpot, playerCount) {
 }
 
 /**
- * Preview stake from setup (maxJackpot ÷ expectedPlayers).
- * Live games prefer state.stake locked at start — use stakeFromState.
- * @param {{ maxJackpot?: unknown, expectedPlayers?: unknown } | null | undefined} setup
- * @returns {number}
- */
-export function stakeFromSetup(setup) {
-  return computeStake(setup?.maxJackpot, setup?.expectedPlayers ?? DEFAULT_EXPECTED_PLAYERS);
-}
-
-/**
- * Live stake: locked at game start when present, else planning preview from setup.
- * @param {{ stake?: unknown, setup?: { maxJackpot?: unknown, expectedPlayers?: unknown } } | null | undefined} state
+ * Live stake: locked at game start when present; else lobby preview from
+ * maxJackpot ÷ current joined count (uses 1 when lobby is empty).
+ * @param {{ stake?: unknown, players?: unknown[], setup?: { maxJackpot?: unknown } } | null | undefined} state
  * @returns {number}
  */
 export function stakeFromState(state) {
   const locked = Math.round(Number(state?.stake));
   if (Number.isFinite(locked) && locked >= 1) return locked;
-  return stakeFromSetup(state?.setup);
+  const n = Array.isArray(state?.players) ? state.players.length : 0;
+  return computeStake(state?.setup?.maxJackpot, Math.max(1, n));
 }
 
 /**

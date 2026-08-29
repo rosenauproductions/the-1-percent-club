@@ -4,12 +4,10 @@ import {
   formatMoney,
   normalizeCurrency,
   normalizeCurrencyLabel,
-  normalizeExpectedPlayers,
   normalizeMaxJackpot,
   computeStake,
   stakeFromState,
   DEFAULT_CURRENCY_LABEL,
-  DEFAULT_EXPECTED_PLAYERS,
   DEFAULT_MAX_JACKPOT,
 } from '../shared/money.js';
 
@@ -53,6 +51,20 @@ function money(n, opts) {
 
 function stake() {
   return stakeFromState(state);
+}
+
+/** Lobby stake preview copy (live joined count; N/A when empty). */
+function stakePreviewHtml(playerCount, maxJackpot, setupForFormat) {
+  const n = Math.max(0, Number(playerCount) || 0);
+  if (n < 1) {
+    return `Each player brings <strong>N/A</strong> until someone joins. Stake locks from joined count when you start. Half-pot offers follow the live prize pot.`;
+  }
+  const amount = computeStake(maxJackpot, n);
+  return `Each player brings <strong>${formatMoney(amount, setupForFormat, {
+    short: true,
+  })}</strong>
+          (max jackpot ÷ ${n} player${n === 1 ? '' : 's'}). Stake locks when you start.
+          Half-pot offers follow the live prize pot.`;
 }
 
 function escapeHtml(s) {
@@ -442,17 +454,8 @@ function renderLobby() {
           <input id="maxJackpotInput" type="number" min="1" max="1000000000" step="1"
             value="${normalizeMaxJackpot(state.setup.maxJackpot)}" />
         </label>
-        <label class="field">Expected players
-          <input id="expectedPlayersInput" type="number" min="1" max="100" step="1"
-            value="${normalizeExpectedPlayers(state.setup.expectedPlayers)}" />
-        </label>
         <p class="muted" id="stakePreview" style="margin:0;font-size:0.85rem">
-          Each player brings <strong>${money(
-            computeStake(state.setup.maxJackpot, state.setup.expectedPlayers),
-            { short: true },
-          )}</strong>
-          (max jackpot ÷ expected players). At start, stake locks from actual joined count.
-          Half-pot offers follow the live prize pot.
+          ${stakePreviewHtml(players.length, normalizeMaxJackpot(state.setup.maxJackpot), state.setup)}
         </p>
         <label class="field">Master volume (0–1)
           <input id="volInput" type="number" min="0" max="1" step="0.05" value="${state.setup.masterVolume ?? 0.7}" />
@@ -997,7 +1000,7 @@ main.addEventListener('input', (e) => {
     const label = document.getElementById('introVolLabel');
     if (label) label.textContent = `${Math.round(Number(t.value || 0) * 100)}%`;
   }
-  if (t.id === 'maxJackpotInput' || t.id === 'expectedPlayersInput' || t.id === 'currencySelect' || t.id === 'currencyLabelInput') {
+  if (t.id === 'maxJackpotInput' || t.id === 'currencySelect' || t.id === 'currencyLabelInput') {
     updateStakePreview();
   }
 });
@@ -1008,10 +1011,6 @@ function updateStakePreview() {
   const pot = normalizeMaxJackpot(
     document.getElementById('maxJackpotInput')?.value || state.setup.maxJackpot,
   );
-  const expected = normalizeExpectedPlayers(
-    document.getElementById('expectedPlayersInput')?.value || state.setup.expectedPlayers,
-  );
-  const amount = computeStake(pot, expected);
   const setupForFormat = {
     ...state.setup,
     currency: normalizeCurrency(
@@ -1021,11 +1020,7 @@ function updateStakePreview() {
       document.getElementById('currencyLabelInput')?.value || state.setup.currencyLabel,
     ),
   };
-  preview.innerHTML = `Each player brings <strong>${formatMoney(amount, setupForFormat, {
-    short: true,
-  })}</strong>
-          (max jackpot ÷ expected players). At start, stake locks from actual joined count.
-          Half-pot offers follow the live prize pot.`;
+  preview.innerHTML = stakePreviewHtml(state.players?.length || 0, pot, setupForFormat);
 }
 
 main.addEventListener('change', async (e) => {
@@ -1136,9 +1131,6 @@ main.addEventListener('click', async (e) => {
         ),
         maxJackpot: normalizeMaxJackpot(
           document.getElementById('maxJackpotInput')?.value || DEFAULT_MAX_JACKPOT,
-        ),
-        expectedPlayers: normalizeExpectedPlayers(
-          document.getElementById('expectedPlayersInput')?.value || DEFAULT_EXPECTED_PLAYERS,
         ),
       },
     });

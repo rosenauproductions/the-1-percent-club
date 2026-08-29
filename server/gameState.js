@@ -4,14 +4,11 @@
 import {
   CLASSIC_STAKE,
   DEFAULT_CURRENCY_LABEL,
-  DEFAULT_EXPECTED_PLAYERS,
   DEFAULT_MAX_JACKPOT,
   computeStake,
   normalizeCurrency,
   normalizeCurrencyLabel,
-  normalizeExpectedPlayers,
   normalizeMaxJackpot,
-  stakeFromSetup,
   stakeFromState,
 } from '../public/shared/money.js';
 
@@ -19,7 +16,7 @@ import {
 export const STAKE = CLASSIC_STAKE;
 export const TEN_K = 10000;
 
-/** Per-player stake / pass / cashout unit (locked at start, else maxJackpot ÷ expectedPlayers). */
+/** Per-player stake / pass / cashout unit (locked at Start game, else lobby preview). */
 export function stakeAmount(state) {
   return stakeFromState(state);
 }
@@ -239,13 +236,10 @@ function normalizeImageTransform(t) {
 export {
   normalizeCurrency,
   normalizeCurrencyLabel,
-  normalizeExpectedPlayers,
   normalizeMaxJackpot,
   computeStake,
-  stakeFromSetup,
   stakeFromState,
   DEFAULT_MAX_JACKPOT,
-  DEFAULT_EXPECTED_PLAYERS,
   DEFAULT_CURRENCY_LABEL,
 };
 
@@ -265,8 +259,6 @@ function defaultSetup() {
     currencyLabel: DEFAULT_CURRENCY_LABEL,
     /** Target prize pot if every player contributes their stake. */
     maxJackpot: DEFAULT_MAX_JACKPOT,
-    /** Planning player count for stake preview (stake = maxJackpot ÷ this). */
-    expectedPlayers: DEFAULT_EXPECTED_PLAYERS,
     sounds: {},
   };
 }
@@ -540,10 +532,9 @@ export function applySetup(state, setup) {
   } else {
     next.maxJackpot = normalizeMaxJackpot(next.maxJackpot);
   }
-  if (setup && Object.prototype.hasOwnProperty.call(setup, 'expectedPlayers')) {
-    next.expectedPlayers = normalizeExpectedPlayers(setup.expectedPlayers);
-  } else {
-    next.expectedPlayers = normalizeExpectedPlayers(next.expectedPlayers);
+  // Drop legacy expectedPlayers if present on older saved state
+  if (Object.prototype.hasOwnProperty.call(next, 'expectedPlayers')) {
+    delete next.expectedPlayers;
   }
   return {
     ...state,
@@ -1672,7 +1663,8 @@ export function clearSoundCue(state) {
 }
 
 export function resetToLobby(state) {
-  const setup = state.setup;
+  const setup = { ...state.setup };
+  delete setup.expectedPlayers;
   return {
     ...createInitialState(),
     setup,
