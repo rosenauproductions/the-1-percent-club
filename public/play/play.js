@@ -8,7 +8,7 @@ import {
   stopPendingEliminating,
 } from '../shared/audio.js';
 import { scanSpotlightId } from '../shared/elimScan.js';
-import { formatMoney, normalizeCurrency } from '../shared/money.js';
+import { formatMoney, stakeFromState } from '../shared/money.js';
 
 installErrorHandlers('play');
 mountQaWidget('play', { audioTools: true });
@@ -54,12 +54,12 @@ function saveIdentity() {
   );
 }
 
-function currency() {
-  return normalizeCurrency(state?.setup?.currency);
+function money(n, opts) {
+  return formatMoney(n, state?.setup, opts);
 }
 
-function money(n, opts) {
-  return formatMoney(n, currency(), opts);
+function stake() {
+  return stakeFromState(state);
 }
 
 function escapeHtml(s) {
@@ -221,7 +221,7 @@ function renderWaiting() {
       <div class="status-pill">SEATED</div>
       <h1 style="margin-top:1rem">${escapeHtml(p?.name || '')}</h1>
       <p>Waiting for the host to start…</p>
-      <p class="muted" style="margin-top:0.75rem">${state.players?.length || 0} contestants · Stake ${money(1000)}</p>
+      <p class="muted" style="margin-top:0.75rem">${state.players?.length || 0} contestants · Stake ${money(stake())}</p>
     </div>
   `;
 }
@@ -395,7 +395,7 @@ function renderAnswering() {
             ? `<button class="pass-btn ${canUsePass ? '' : 'pass-btn--locked'}" id="passBtn" type="button" aria-disabled="${canUsePass ? 'false' : 'true'}">
                 <span class="pass-btn__eyebrow">SAFETY NET</span>
                 <span class="pass-btn__title">USE PASS</span>
-                <span class="pass-btn__sub">−${money(1000, { short: true })} to jackpot · skip this question</span>
+                <span class="pass-btn__sub">−${money(stake(), { short: true })} to jackpot · skip this question</span>
                </button>
                <p class="pass-hint" id="passHint">${
                  canUsePass
@@ -426,7 +426,7 @@ function renderPassBriefing() {
       <h1>You have a PASS</h1>
       <p class="muted">${
         hasPass
-          ? `One free escape on a later question. Using it puts ${money(1000)} in the jackpot.`
+          ? `One free escape on a later question. Using it puts ${money(stake())} in the jackpot.`
           : 'Listen to the host — passes are being explained.'
       }</p>
       <p class="muted" style="margin-top:0.75rem">Hang tight for the 50% question.</p>
@@ -440,16 +440,16 @@ function renderCashout() {
   main.innerHTML = `
     <div class="hero">
       <h1>Before 30%</h1>
-      <p>Leave now with ${money(1000)}?</p>
+      <p>Leave now with ${money(stake())}?</p>
     </div>
     <div class="card">
       ${
         !eligible
           ? `<p class="muted">You already used your pass — you must continue.</p>`
           : decided !== undefined
-            ? `<p class="muted">You chose: <strong>${decided ? `LEAVE with ${money(1000)}` : 'STAY'}</strong></p>`
+            ? `<p class="muted">You chose: <strong>${decided ? `LEAVE with ${money(stake())}` : 'STAY'}</strong></p>`
             : `<div class="stack">
-                <button class="btn-gold big-btn" id="leaveBtn">Leave with ${money(1000)}</button>
+                <button class="btn-gold big-btn" id="leaveBtn">Leave with ${money(stake())}</button>
                 <button class="btn-primary big-btn" id="stayBtn">Stay in the game</button>
               </div>`
       }

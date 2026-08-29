@@ -14,7 +14,7 @@ import {
 } from '../shared/audio.js';
 import { installErrorHandlers, mountQaWidget, showBoot, hideBoot } from '../shared/boot.js';
 import { scanSpotlightId } from '../shared/elimScan.js';
-import { formatMoney, normalizeCurrency } from '../shared/money.js';
+import { formatMoney, normalizeCurrency, stakeFromState } from '../shared/money.js';
 
 installErrorHandlers('display');
 mountQaWidget('display');
@@ -37,7 +37,11 @@ function currency() {
 }
 
 function money(n, opts) {
-  return formatMoney(n, currency(), opts);
+  return formatMoney(n, state?.setup, opts);
+}
+
+function stake() {
+  return stakeFromState(state);
 }
 
 function syncScanSeats() {
@@ -235,7 +239,7 @@ function renderIntro() {
   main.innerHTML = `
     <div class="center-phase">
       <h1>THE <span class="pct">1%</span> CLUB</h1>
-      <p>${state.players.length} contestants · ${money(state.players.length * 1000)} at stake</p>
+      <p>${state.players.length} contestants · ${money(state.players.length * stake())} at stake</p>
       <p>15 questions. Only the sharpest make it to the final 1%.</p>
     </div>
   `;
@@ -660,7 +664,7 @@ function renderPassBriefing() {
   main.innerHTML = `
     <div class="center-phase">
       <h1>YOU NOW HAVE A <span class="pct">PASS</span></h1>
-      <p>One free escape. Using it puts ${money(1000)} into the prize pot.</p>
+      <p>One free escape. Using it puts ${money(stake())} into the prize pot.</p>
       <img
         class="pass-example-art"
         src="/images/pass-available-example.png"
@@ -675,8 +679,8 @@ function renderPassBriefing() {
 function renderCashout() {
   main.innerHTML = `
     <div class="center-phase">
-      <h1>TAKE THE <span class="pct">${money(1000)}</span>?</h1>
-      <p>Players who still have their pass may leave with ${money(1000)} before the 30% question.</p>
+      <h1>TAKE THE <span class="pct">${money(stake())}</span>?</h1>
+      <p>Players who still have their pass may leave with ${money(stake())} before the 30% question.</p>
       <div class="side-grid" style="width:70%;max-height:40%">${renderSeatGrid(state.players.filter((p) => p.status === 'active'))}</div>
     </div>
   `;
@@ -726,7 +730,7 @@ function renderFinale() {
             let tag = '';
             if (p.status === 'took10k') tag = ` (took ${money(p.winnings)})`;
             else if (p.status === 'cashed') tag = ' (cashed out)';
-            else if (p.status === 'out') tag = ` (kept ${money(1000, { short: true })} bonus)`;
+            else if (p.status === 'out') tag = ` (kept ${money(stake(), { short: true })} bonus)`;
             return `<li>${escapeHtml(p.name)} · ${money(p.winnings)}${tag}</li>`;
           })
           .join('') || '<li>Nobody survived</li>'}

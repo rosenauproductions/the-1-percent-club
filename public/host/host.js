@@ -1,6 +1,17 @@
 import { connect, sendAction } from '../shared/ws.js';
 import { installErrorHandlers, mountQaWidget, showBoot, hideBoot } from '../shared/boot.js';
-import { formatMoney, normalizeCurrency } from '../shared/money.js';
+import {
+  formatMoney,
+  normalizeCurrency,
+  normalizeCurrencyLabel,
+  normalizeExpectedPlayers,
+  normalizeMaxJackpot,
+  computeStake,
+  stakeFromState,
+  DEFAULT_CURRENCY_LABEL,
+  DEFAULT_EXPECTED_PLAYERS,
+  DEFAULT_MAX_JACKPOT,
+} from '../shared/money.js';
 
 installErrorHandlers('host');
 mountQaWidget('host');
@@ -37,7 +48,11 @@ function currency() {
 }
 
 function money(n, opts) {
-  return formatMoney(n, currency(), opts);
+  return formatMoney(n, state?.setup, opts);
+}
+
+function stake() {
+  return stakeFromState(state);
 }
 
 function escapeHtml(s) {
@@ -394,10 +409,29 @@ function renderLobby() {
           <select id="currencySelect">
             <option value="points" ${currency() === 'points' ? 'selected' : ''}>Points</option>
             <option value="dollars" ${currency() === 'dollars' ? 'selected' : ''}>Dollars</option>
+            <option value="custom" ${currency() === 'custom' ? 'selected' : ''}>Custom unit</option>
           </select>
         </label>
-        <p class="muted" style="margin:0;font-size:0.85rem">
-          Pack Editor currency is applied when you start that pack. For packs without one, Save setup uses this value (default: points).
+        <label class="field" id="currencyLabelField" style="${currency() === 'custom' ? '' : 'display:none'}">Unit name
+          <input id="currencyLabelInput" type="text" maxlength="32"
+            value="${escapeHtml(normalizeCurrencyLabel(state.setup.currencyLabel))}"
+            placeholder="${DEFAULT_CURRENCY_LABEL}" />
+        </label>
+        <label class="field">Max jackpot
+          <input id="maxJackpotInput" type="number" min="1" max="1000000000" step="1"
+            value="${normalizeMaxJackpot(state.setup.maxJackpot)}" />
+        </label>
+        <label class="field">Expected players
+          <input id="expectedPlayersInput" type="number" min="1" max="100" step="1"
+            value="${normalizeExpectedPlayers(state.setup.expectedPlayers)}" />
+        </label>
+        <p class="muted" id="stakePreview" style="margin:0;font-size:0.85rem">
+          Each player brings <strong>${money(
+            computeStake(state.setup.maxJackpot, state.setup.expectedPlayers),
+            { short: true },
+          )}</strong>
+          (max jackpot ÷ expected players). At start, stake locks from actual joined count.
+          Half-pot offers follow the live prize pot.
         </p>
         <label class="field">Master volume (0–1)
           <input id="volInput" type="number" min="0" max="1" step="0.05" value="${state.setup.masterVolume ?? 0.7}" />
@@ -459,7 +493,7 @@ function renderPassBriefing() {
           “Everyone still in just earned a <span style="color:var(--club-gold,#ffd54a)">PASS</span>.”
         </p>
         <p style="margin:0 0 0.5rem">
-          “One free escape on a later question. Use it and you’re safe — but your ${money(1000)} goes into the prize pot.”
+          “One free escape on a later question. Use it and you’re safe — but your ${money(stake())} goes into the prize pot.”
         </p>
         <p style="margin:0">
           “You can’t use it on the 1% question. Hold it or burn it wisely.”
@@ -642,7 +676,7 @@ function renderCashout() {
           .map((p) => {
             const d = state.cashoutDecisions?.[p.id];
             return `<li><div class="name">${escapeHtml(p.name)}</div>
-              <div class="text">${d === true ? `LEAVING with ${money(1000, { short: true })}` : d === false ? 'STAYING' : '…deciding'}</div></li>`;
+              <div class="text">${d === true ? `LEAVING with ${money(stake(), { short: true })}` : d === false ? 'STAYING' : '…deciding'}</div></li>`;
           })
           .join('')}
       </ul>
@@ -942,11 +976,48 @@ main.addEventListener('input', (e) => {
     const label = document.getElementById('introVolLabel');
     if (label) label.textContent = `${Math.round(Number(t.value || 0) * 100)}%`;
   }
+  if (t.id === 'maxJackpotInput' || t.id === 'expectedPlayersInput' || t.id === 'currencySelect' || t.id === 'currencyLabelInput') {
+    updateStakePreview();
+  }
 });
+
+function updateStakePreview() {
+  const preview = document.getElementById('stakePreview');
+  if (!preview || !state) return;
+  const pot = normalizeMaxJackpot(
+    document.getElementById('maxJackpotInput')?.value || state.setup.maxJackpot,
+  );
+  const expected = normalizeExpectedPlayers(
+    document.getElementById('expectedPlayersInput')?.value || state.setup.expectedPlayers,
+  );
+  const amount = computeStake(pot, expected);
+  const setupForFormat = {
+    ...state.setup,
+    currency: normalizeCurrency(
+      document.getElementById('currencySelect')?.value || state.setup.currency,
+    ),
+    currencyLabel: normalizeCurrencyLabel(
+      document.getElementById('currencyLabelInput')?.value || state.setup.currencyLabel,
+    ),
+  };
+  preview.innerHTML = `Each player brings <strong>${formatMoney(amount, setupForFormat, {
+    short: true,
+  })}</strong>
+          (max jackpot ÷ expected players). At start, stake locks from actual joined count.
+          Half-pot offers follow the live prize pot.`;
+}
 
 main.addEventListener('change', async (e) => {
   const t = e.target;
   if (!(t instanceof HTMLElement)) return;
+
+  if (t.id === 'currencySelect') {
+    const field = document.getElementById('currencyLabelField');
+    if (field) field.style.display = t.value === 'custom' ? '' : 'none';
+    updateStakePreview();
+    return;
+  }
+
   if (t.id !== 'packSelect') return;
   const file = t.value;
   if (!file) return;
@@ -964,6 +1035,8 @@ main.addEventListener('change', async (e) => {
     if (c !== 'dollars' && c !== 'points') return;
     const sel = document.getElementById('currencySelect');
     if (sel) sel.value = c;
+    const labelField = document.getElementById('currencyLabelField');
+    if (labelField) labelField.style.display = 'none';
     await act('update_setup', { setup: { questionFile: file, currency: c } });
   } catch {
     // ignore
@@ -1037,6 +1110,15 @@ main.addEventListener('click', async (e) => {
         fastFinishWhenAllLocked: !!document.getElementById('fastFinish')?.checked,
         skipIntro: !!document.getElementById('skipIntro')?.checked,
         currency: normalizeCurrency(document.getElementById('currencySelect')?.value),
+        currencyLabel: normalizeCurrencyLabel(
+          document.getElementById('currencyLabelInput')?.value || DEFAULT_CURRENCY_LABEL,
+        ),
+        maxJackpot: normalizeMaxJackpot(
+          document.getElementById('maxJackpotInput')?.value || DEFAULT_MAX_JACKPOT,
+        ),
+        expectedPlayers: normalizeExpectedPlayers(
+          document.getElementById('expectedPlayersInput')?.value || DEFAULT_EXPECTED_PLAYERS,
+        ),
       },
     });
     if (ok) {

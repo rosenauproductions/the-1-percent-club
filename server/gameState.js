@@ -1,8 +1,28 @@
 /** @typedef {'lobby'|'intro'|'pass_briefing'|'question'|'answering'|'eliminating'|'eliminated_count'|'left_count'|'answer_reveal'|'prize_pot'|'reveal'|'cashout_offer'|'final_choice'|'solo_offer'|'finale'|'game_end'} Phase */
 /** @typedef {'active'|'out'|'cashed'|'took10k'|'winner'} PlayerStatus */
 
-export const STAKE = 1000;
+import {
+  CLASSIC_STAKE,
+  DEFAULT_CURRENCY_LABEL,
+  DEFAULT_EXPECTED_PLAYERS,
+  DEFAULT_MAX_JACKPOT,
+  computeStake,
+  normalizeCurrency,
+  normalizeCurrencyLabel,
+  normalizeExpectedPlayers,
+  normalizeMaxJackpot,
+  stakeFromSetup,
+  stakeFromState,
+} from '../public/shared/money.js';
+
+/** Classic reference stake (pre–max-jackpot). Live games use stakeAmount(state). */
+export const STAKE = CLASSIC_STAKE;
 export const TEN_K = 10000;
+
+/** Per-player stake / pass / cashout unit (locked at start, else maxJackpot ÷ expectedPlayers). */
+export function stakeAmount(state) {
+  return stakeFromState(state);
+}
 
 /** Final / solo buyout offer: half the current prize pot. */
 export function finalOfferAmount(state) {
@@ -216,10 +236,18 @@ function normalizeImageTransform(t) {
   };
 }
 
-/** @param {unknown} value */
-export function normalizeCurrency(value) {
-  return value === 'dollars' ? 'dollars' : 'points';
-}
+export {
+  normalizeCurrency,
+  normalizeCurrencyLabel,
+  normalizeExpectedPlayers,
+  normalizeMaxJackpot,
+  computeStake,
+  stakeFromSetup,
+  stakeFromState,
+  DEFAULT_MAX_JACKPOT,
+  DEFAULT_EXPECTED_PLAYERS,
+  DEFAULT_CURRENCY_LABEL,
+};
 
 function defaultSetup() {
   return {
@@ -231,8 +259,14 @@ function defaultSetup() {
     /** When true, cut the answer window to ~3s once everyone has locked. Default off. */
     fastFinishWhenAllLocked: false,
     skipIntro: false,
-    /** Display unit for stakes/jackpot: 'points' (default) or 'dollars'. */
+    /** Display unit: 'points' (default), 'dollars', or 'custom' (currencyLabel). */
     currency: 'points',
+    /** Word shown after amounts when currency is custom. */
+    currencyLabel: DEFAULT_CURRENCY_LABEL,
+    /** Target prize pot if every player contributes their stake. */
+    maxJackpot: DEFAULT_MAX_JACKPOT,
+    /** Planning player count for stake preview (stake = maxJackpot ÷ this). */
+    expectedPlayers: DEFAULT_EXPECTED_PLAYERS,
     sounds: {},
   };
 }
@@ -279,6 +313,8 @@ export function createInitialState() {
     playerConnections: 0,
     players: [],
     jackpot: 0,
+    /** Locked per-player stake for the run (set in startGame). */
+    stake: null,
     questionIndex: -1,
     questions: [],
     packName: null,
@@ -418,12 +454,13 @@ export function sanitizeStateForClient(state, role, playerId = null) {
 function awardOnePercentWinners(state) {
   const survivors = state.players.filter((p) => p.status === 'active');
   if (!survivors.length) return state;
+  const stake = stakeAmount(state);
   const share = Math.floor(state.jackpot / survivors.length);
   return {
     ...state,
     players: state.players.map((p) => {
       if (p.status !== 'active') return p;
-      const keep = !p.stakeInJackpot ? STAKE : 0;
+      const keep = !p.stakeInJackpot ? stake : 0;
       return { ...p, status: 'winner', winnings: share + keep };
     }),
   };
@@ -445,6 +482,21 @@ export function applySetup(state, setup) {
     next.currency = normalizeCurrency(setup.currency);
   } else {
     next.currency = normalizeCurrency(next.currency);
+  }
+  if (setup && Object.prototype.hasOwnProperty.call(setup, 'currencyLabel')) {
+    next.currencyLabel = normalizeCurrencyLabel(setup.currencyLabel);
+  } else {
+    next.currencyLabel = normalizeCurrencyLabel(next.currencyLabel);
+  }
+  if (setup && Object.prototype.hasOwnProperty.call(setup, 'maxJackpot')) {
+    next.maxJackpot = normalizeMaxJackpot(setup.maxJackpot);
+  } else {
+    next.maxJackpot = normalizeMaxJackpot(next.maxJackpot);
+  }
+  if (setup && Object.prototype.hasOwnProperty.call(setup, 'expectedPlayers')) {
+    next.expectedPlayers = normalizeExpectedPlayers(setup.expectedPlayers);
+  } else {
+    next.expectedPlayers = normalizeExpectedPlayers(next.expectedPlayers);
   }
   return {
     ...state,
@@ -603,6 +655,8 @@ export function startGame(state, questions, packName = null, packSettings = null
     };
   });
 
+  const lockedStake = computeStake(state.setup?.maxJackpot, state.players.length);
+
   let next = {
     ...state,
     lobbyOpen: false,
@@ -610,6 +664,7 @@ export function startGame(state, questions, packName = null, packSettings = null
     packName,
     packSettings: settings,
     jackpot: 0,
+    stake: lockedStake,
     questionIndex: -1,
     currentQuestion: null,
     timerEndsAt: null,
@@ -811,7 +866,8 @@ export function usePass(state, playerId) {
   if (!player.hasPass || player.usedPass) throw new Error('No pass available');
   if (state.answers[playerId]?.usedPass) throw new Error('Already used pass');
 
-  // Using a pass puts $1000 into the jackpot (final — replaces any prior letter answer)
+  // Using a pass puts the player's stake into the jackpot (final — replaces any prior letter answer)
+  const stake = stakeAmount(state);
   const players = state.players.map((p) =>
     p.id === playerId ? { ...p, usedPass: true, hasPass: false, stakeInJackpot: true } : p,
   );
@@ -820,7 +876,7 @@ export function usePass(state, playerId) {
     cue(
       {
         ...state,
-        jackpot: state.jackpot + STAKE,
+        jackpot: state.jackpot + stake,
         players,
         answers: {
           ...state.answers,
@@ -872,14 +928,15 @@ export function hostOverride(state, playerId, correct) {
   const wasCorrect = result.correct;
   if (wasCorrect === !!correct) return state;
 
+  const stake = stakeAmount(state);
   let jackpot = state.jackpot;
   const players = state.players.map((p) => {
     if (p.id !== playerId) return p;
     if (correct) {
-      if (p.stakeInJackpot) jackpot = Math.max(0, jackpot - STAKE);
+      if (p.stakeInJackpot) jackpot = Math.max(0, jackpot - stake);
       return { ...p, status: 'active', stakeInJackpot: false };
     }
-    if (!p.stakeInJackpot) jackpot += STAKE;
+    if (!p.stakeInJackpot) jackpot += stake;
     return { ...p, status: 'out', stakeInJackpot: true };
   });
 
@@ -936,6 +993,7 @@ export function endAnsweringWithForces(state) {
     throw new Error('Not in answering');
   }
   const q = state.currentQuestion;
+  const stake = stakeAmount(state);
   const results = [];
   let jackpotAdd = 0;
   const wrongIds = [];
@@ -974,11 +1032,11 @@ export function endAnsweringWithForces(state) {
 
     if (!correct) {
       wrongIds.push(p.id);
-      // On the 1% question, unspent $1,000 stays with the player as a bonus even if wrong.
+      // On the 1% question, an unspent stake stays with the player as a bonus even if wrong.
       if (state.questionIndex === ONE_PERCENT_INDEX && !p.stakeInJackpot) {
-        return { ...p, winnings: Math.max(p.winnings || 0, STAKE) };
+        return { ...p, winnings: Math.max(p.winnings || 0, stake) };
       }
-      if (!p.stakeInJackpot) jackpotAdd += STAKE;
+      if (!p.stakeInJackpot) jackpotAdd += stake;
       // Stay active until the blue-light sequence reveals them
       return { ...p, stakeInJackpot: true };
     }
@@ -1394,10 +1452,11 @@ export function cashoutDecide(state, playerId, leave) {
 export function resolveCashout(state) {
   if (state.phase !== 'cashout_offer') throw new Error('Not in cashout');
   const eligible = activePlayers(state).filter((p) => p.hasPass && !p.usedPass);
+  const stake = stakeAmount(state);
   // Anyone who didn't decide stays
   const players = state.players.map((p) => {
     if (state.cashoutDecisions[p.id] === true) {
-      return { ...p, status: 'cashed', winnings: STAKE };
+      return { ...p, status: 'cashed', winnings: stake };
     }
     return p;
   });
