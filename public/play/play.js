@@ -418,14 +418,17 @@ function renderAnswering() {
     ? Math.max(0, Math.ceil((state.timerEndsAt - Date.now()) / 1000))
     : null;
   const p = me();
-  const usedPass = !!p?.usedPass || !!ans?.usedPass;
-  const hasPass = !!p?.hasPass && !usedPass;
+  // ans.usedPass = passed this question; p.usedPass = already spent their only pass (persists)
+  const passedThisQuestion = !!ans?.usedPass;
+  const spentPass = !!p?.usedPass || passedThisQuestion;
+  const hasPass = !!p?.hasPass && !spentPass;
   const isOnePercent = state.questionIndex === 14;
   const canUsePass = hasPass && !isOnePercent;
-  const showPassBtn = !usedPass;
+  // Hide USE PASS after spending — never cover the answer pad on later questions
+  const showPassBtn = !spentPass;
 
-  // Pass is final — show confirmation once used
-  if (ans?.usedPass || usedPass) {
+  // Only replace the pad for the question they actually passed — not every later round
+  if (passedThisQuestion) {
     answerDraft = '';
     answeringViewKey = '';
     main.innerHTML = `
