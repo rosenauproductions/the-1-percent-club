@@ -3,3 +3,4 @@ node_modules/
 *.log
 .env
 data/feedback.jsonl
+data/drive-imports.json

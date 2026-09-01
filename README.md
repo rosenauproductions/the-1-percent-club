@@ -125,6 +125,18 @@ Example image pack: `data/questions/split-decision.json` → images in `public/i
 
 Start from `data/pack-template.json`, or edit packs in the local **`/admin`** editor and download JSON.
 
+### Load from Google Drive (host)
+
+On the host Setup screen, paste a **public** (“Anyone with the link”) Drive URL and tap **Import**. The pack is downloaded onto the server (JSON + images), appears in the pack dropdown, and works with **Preview** like bundled packs. Survives reboot until you **Clear Drive pack**.
+
+| Link type | Works when |
+|-----------|------------|
+| **Zip file** (recommended) | Zip contains a pack JSON (`questions.json` / `pack.json` / any `*.json` with `questions`) plus image files matching the JSON `image` / `solutionImage` names |
+| **Single JSON file** | Image fields are `https://…` URLs, or you don’t need local images |
+| **Folder** (JSON + images) | Same contents as the zip layout; requires server env `GOOGLE_API_KEY` or `DRIVE_API_KEY` (Drive API key, public files only — no OAuth) |
+
+Prepare a show pack: export JSON from `/admin`, put boards next to it (e.g. `90a.png` / `90b.png`), zip the folder, upload to Drive, share as Anyone with the link, paste that link on the host.
+
 Answers are graded with case-insensitive normalized matching. Host can force ✓/✗ on reveal.
 
 ## Architecture

@@ -52,6 +52,12 @@ import {
 } from './gameState.js';
 import { MDNS_NAME, networkInfo } from './network.js';
 import { Bonjour } from 'bonjour-service';
+import {
+  importDrivePack,
+  clearDriveImport,
+  listDriveImports,
+  DriveImportError,
+} from './driveImport.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, '..');
@@ -59,6 +65,7 @@ const QUESTIONS_DIR = path.join(ROOT, 'data', 'questions');
 const SOUNDS_DIR = path.join(ROOT, 'public', 'sounds');
 const PUBLIC_DIR = path.join(ROOT, 'public');
 const FEEDBACK_FILE = path.join(ROOT, 'data', 'feedback.jsonl');
+const DRIVE_IMPORTS_FILE = path.join(ROOT, 'data', 'drive-imports.json');
 const PORT = Number(process.env.PORT) || 3457;
 
 let state = createInitialState();
@@ -537,6 +544,80 @@ app.get('/api/question-pack', async (req, res) => {
     res.json(body);
   } catch (err) {
     res.status(400).json({ error: err.message });
+  }
+});
+
+/** List packs previously imported from Google Drive (for Clear UI). */
+app.get('/api/packs/drive-imports', async (_req, res) => {
+  try {
+    res.json({ imports: await listDriveImports(DRIVE_IMPORTS_FILE) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * Import a public Google Drive pack (zip / JSON / folder with API key).
+ * Body: { url: string }
+ */
+app.post('/api/packs/import-drive', async (req, res) => {
+  try {
+    const url = String(req.body?.url || '').trim();
+    if (!url) {
+      res.status(400).json({ error: 'url required' });
+      return;
+    }
+    const result = await importDrivePack({
+      url,
+      questionsDir: QUESTIONS_DIR,
+      publicDir: PUBLIC_DIR,
+      importsManifestPath: DRIVE_IMPORTS_FILE,
+    });
+    const files = await listQuestionFiles();
+    res.json({
+      ok: true,
+      ...result,
+      files,
+      imports: await listDriveImports(DRIVE_IMPORTS_FILE),
+    });
+  } catch (err) {
+    const status = err instanceof DriveImportError ? err.status || 400 : 500;
+    res.status(status).json({ error: err.message || 'Import failed' });
+  }
+});
+
+/** Remove a Drive-imported pack from disk (bundled packs are not deletable here). */
+app.post('/api/packs/clear-drive', async (req, res) => {
+  try {
+    const packId = String(req.body?.packId || req.body?.file || '').trim();
+    if (!packId) {
+      res.status(400).json({ error: 'packId required' });
+      return;
+    }
+    const result = await clearDriveImport({
+      packId,
+      questionsDir: QUESTIONS_DIR,
+      publicDir: PUBLIC_DIR,
+      importsManifestPath: DRIVE_IMPORTS_FILE,
+    });
+    // If cleared pack was selected, fall back to first remaining file
+    const files = await listQuestionFiles();
+    if (state.setup?.questionFile === result.file) {
+      state = applySetup(state, {
+        questionFile: files[0] || 'split-decision.json',
+      });
+    }
+    res.json({
+      ok: true,
+      ...result,
+      files,
+      imports: await listDriveImports(DRIVE_IMPORTS_FILE),
+      questionFile: state.setup.questionFile,
+    });
+    broadcast();
+  } catch (err) {
+    const status = err instanceof DriveImportError ? err.status || 400 : 500;
+    res.status(status).json({ error: err.message || 'Clear failed' });
   }
 });
 

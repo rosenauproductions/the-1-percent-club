@@ -21,6 +21,12 @@ const jackpotEl = document.getElementById('jackpot');
 
 let state = null;
 let questionFiles = [];
+/** @type {{ packId: string, file: string, name?: string }[]} */
+let driveImports = [];
+let driveImportUi = {
+  status: '', // '' | loading | ok | error
+  message: '',
+};
 
 /** Local host-only pack preview (does not broadcast / advance live game). */
 let packPreview = {
@@ -149,6 +155,19 @@ async function loadPacks() {
   } catch {
     questionFiles = ['split-decision.json'];
   }
+  try {
+    const res = await fetch('/api/packs/drive-imports');
+    const data = await res.json();
+    driveImports = Array.isArray(data.imports) ? data.imports : [];
+  } catch {
+    driveImports = [];
+  }
+}
+
+function isDriveImportedFile(file) {
+  if (!file) return false;
+  const id = String(file).replace(/\.json$/i, '');
+  return driveImports.some((x) => x.packId === id || x.file === file);
 }
 
 function selectedPackFile() {
@@ -435,6 +454,33 @@ function renderLobby() {
               .join('')}
           </select>
         </label>
+        <div class="drive-import">
+          <label class="field">Load from Google Drive
+            <input id="driveUrlInput" type="url" inputmode="url" autocomplete="off"
+              placeholder="Public folder, zip, or JSON share link" />
+          </label>
+          <div class="row" style="gap:0.5rem;flex-wrap:wrap">
+            <button type="button" class="btn-ghost" id="importDriveBtn"
+              ${driveImportUi.status === 'loading' ? 'disabled' : ''}>
+              ${driveImportUi.status === 'loading' ? 'Importing…' : 'Import'}
+            </button>
+            ${
+              isDriveImportedFile(state.setup.questionFile)
+                ? `<button type="button" class="btn-danger" id="clearDriveBtn"
+                    ${driveImportUi.status === 'loading' ? 'disabled' : ''}>
+                    Clear Drive pack
+                  </button>`
+                : ''
+            }
+          </div>
+          <p class="muted drive-import-status" id="driveImportStatus" style="margin:0;font-size:0.85rem;${
+            driveImportUi.status === 'error'
+              ? 'color:#ff8a80'
+              : driveImportUi.status === 'ok'
+                ? 'color:#a5d6a7'
+                : ''
+          }">${escapeHtml(driveImportUi.message || 'Anyone-with-the-link zip (JSON + images), JSON file, or folder (needs API key on server).')}</p>
+        </div>
         <label class="field">Answer seconds
           <input id="secsInput" type="number" min="10" max="120" value="${state.setup.answerSeconds || 30}" />
         </label>
@@ -1083,6 +1129,86 @@ main.addEventListener('click', async (e) => {
     if (!file) return;
     packPreview.index = 0;
     await loadPackPreview(file, { open: true });
+    return;
+  }
+
+  if (t.id === 'importDriveBtn') {
+    const input = document.getElementById('driveUrlInput');
+    const url = (input instanceof HTMLInputElement ? input.value : '').trim();
+    if (!url) {
+      driveImportUi = { status: 'error', message: 'Paste a public Google Drive URL first.' };
+      if (state?.phase === 'lobby') render();
+      return;
+    }
+    driveImportUi = { status: 'loading', message: 'Downloading from Drive…' };
+    if (state?.phase === 'lobby') render();
+    // Restore URL after re-render
+    const again = document.getElementById('driveUrlInput');
+    if (again instanceof HTMLInputElement) again.value = url;
+    try {
+      const res = await fetch('/api/packs/import-drive', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Import failed');
+      questionFiles = data.files || questionFiles;
+      driveImports = Array.isArray(data.imports) ? data.imports : driveImports;
+      const file = data.file;
+      driveImportUi = {
+        status: 'ok',
+        message: `Imported “${data.name || file}” · ${data.questionCount ?? '?'} questions · ${data.imageCount ?? 0} images`,
+      };
+      await act('update_setup', { setup: { questionFile: file } });
+      packPreview.index = 0;
+      if (packPreview.open) await loadPackPreview(file, { open: true });
+      if (state?.phase === 'lobby') render();
+      const sel = document.getElementById('packSelect');
+      if (sel) sel.value = file;
+      const urlEl = document.getElementById('driveUrlInput');
+      if (urlEl instanceof HTMLInputElement) urlEl.value = url;
+    } catch (err) {
+      driveImportUi = {
+        status: 'error',
+        message: err.message || 'Import failed',
+      };
+      if (state?.phase === 'lobby') render();
+      const urlEl = document.getElementById('driveUrlInput');
+      if (urlEl instanceof HTMLInputElement) urlEl.value = url;
+    }
+    return;
+  }
+
+  if (t.id === 'clearDriveBtn') {
+    const file = selectedPackFile() || state?.setup?.questionFile;
+    if (!file || !isDriveImportedFile(file)) return;
+    driveImportUi = { status: 'loading', message: 'Clearing Drive pack…' };
+    if (state?.phase === 'lobby') render();
+    try {
+      const res = await fetch('/api/packs/clear-drive', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ file }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Clear failed');
+      questionFiles = data.files || questionFiles;
+      driveImports = Array.isArray(data.imports) ? data.imports : [];
+      const nextFile = data.questionFile || questionFiles[0] || '';
+      driveImportUi = {
+        status: 'ok',
+        message: `Cleared ${file}. Selected ${nextFile || 'none'}.`,
+      };
+      resetPackPreview();
+      if (state?.phase === 'lobby') render();
+    } catch (err) {
+      driveImportUi = {
+        status: 'error',
+        message: err.message || 'Clear failed',
+      };
+      if (state?.phase === 'lobby') render();
+    }
     return;
   }
 
